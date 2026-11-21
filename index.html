@@ -216,7 +216,9 @@ async function loadFlies(){
     .select("*, fly_species(species_id), fly_materials(*), fly_steps(*), author:profiles!flies_author_profile_fk(display_name)")
     .order("is_starter", { ascending:false }).order("name");
   if(error){ console.error(error); toast("Couldn't load flies"); S.flies=[]; return; }
-  S.flies = data;
+  S.hidden = new Set();
+  if(S.user){ const { data: h } = await sb.from("hidden_authors").select("author_id"); (h||[]).forEach(x=>S.hidden.add(x.author_id)); }
+  S.flies = data.filter(f => !S.hidden.has(f.author_id));
 }
 async function loadInventory(){
   if(!S.user){ S.inventory=[]; return; }
@@ -295,12 +297,13 @@ function openAccount(){
     <div class="row" style="margin-top:12px"><button class="btn" id="saveDn">Save</button><button class="btn alt" id="out">Sign out</button></div>
     <p class="small muted" id="aiLeft"></p>
     <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
-    <p class="small"><a href="/privacy.html" target="_blank" rel="noopener">Privacy policy</a></p>
+    <p class="small"><a href="/privacy.html" target="_blank" rel="noopener">Privacy policy</a>${S.hidden?.size?` · <a href="#" id="unhide">Show hidden members (${S.hidden.size})</a>`:""}</p>
     <button class="btn danger" id="delAcct" style="width:100%">Delete my account</button>
     <p class="small muted" style="margin-top:6px">Permanently deletes your login, recipes, materials inventory and fish log.</p>`);
   sb.from("ai_usage").select("count").eq("day", new Date().toISOString().slice(0,10)).maybeSingle().then(({data})=>{ $("#aiLeft",s).textContent = `Photo IDs used today: ${data?.count||0} of 20`; });
   $("#saveDn",s).onclick = async()=>{ await sb.from("profiles").update({display_name:$("#dn",s).value.trim()}).eq("id",S.user.id); await refreshUser(); s.remove(); toast("Saved"); };
   $("#out",s).onclick = async()=>{ await sb.auth.signOut(); s.remove(); await afterAuth(); };
+  if($("#unhide",s)) $("#unhide",s).onclick = async e=>{ e.preventDefault(); await sb.from("hidden_authors").delete().eq("user_id", S.user.id); s.remove(); S.flies=null; toast("Hidden members shown again"); render(); };
   $("#delAcct",s).onclick = async()=>{
     const typed = prompt("This permanently deletes your account, all your recipes (including shared ones), your materials inventory and your fish log. It can't be undone.\n\nType DELETE to confirm.");
     if(typed !== "DELETE"){ if(typed!==null) toast("Not deleted. You must type DELETE."); return; }
@@ -394,8 +397,19 @@ function openFly(id){
       <ol class="steps">${steps.map(st=>`<li>${esc(st.instruction)}${st.photo_path?`<img loading="lazy" src="${flyPhotoUrl(st.photo_path)}" alt="Step ${st.step_no}">`:""}${st.youtube_url?ytEmbed(st.youtube_url):""}</li>`).join("") || `<li class="muted">No steps yet.</li>`}</ol>
     </div>
     ${(f.tutorial_links||[]).length?`<div class="card"><h3>Watch it tied</h3>${f.tutorial_links.map(l=>`<p style="margin:8px 0 0"><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label||l.url)} ↗</a></p>`).join("")}</div>`:""}
+    ${!f.is_starter && !mine ? `<div class="row" style="margin-bottom:10px"><button class="btn sm ghost" id="repF">⚑ Report this recipe</button><span class="grow"></span>${f.author_id?`<button class="btn sm ghost" id="hideF">Hide this member's recipes</button>`:""}</div>`:""}
     <button class="btn alt" style="width:100%" id="closeF">Close</button>`);
   $("#closeF",s).onclick=()=>s.remove();
+  if($("#repF",s)) $("#repF",s).onclick=async()=>{ if(!requireUser()) return;
+    const reason = prompt("What's wrong with this recipe? (e.g. offensive, spam, copied without credit, unsafe)");
+    if(!reason || !reason.trim()) return;
+    const { error } = await sb.from("content_reports").insert({ fly_id:f.id, reason:reason.trim().slice(0,1000) });
+    toast(error ? "Couldn't send the report. Please try again." : "Thanks. We'll review this recipe.", 3500); };
+  if($("#hideF",s)) $("#hideF",s).onclick=async()=>{ if(!requireUser()) return;
+    if(!confirm(`Hide all recipes from ${f.author?.display_name||"this member"}? You can undo this from Account.`)) return;
+    const { error } = await sb.from("hidden_authors").insert({ author_id:f.author_id });
+    if(error && error.code!=="23505") return toast("Couldn't hide this member.");
+    s.remove(); S.flies=null; toast("Hidden"); renderFlies(); };
   if($("#editF",s)) $("#editF",s).onclick=()=>{ s.remove(); editFly(f); };
   if($("#copyNeed",s)) $("#copyNeed",s).onclick=async()=>{ const txt=`${f.name} – need:\n`+needList.map(m=>`• ${m.material_text}`).join("\n"); try{ await navigator.clipboard.writeText(txt); toast("Shopping list copied"); }catch{ sheet(`<h3>Shopping list</h3><textarea style="min-height:180px">${esc(txt)}</textarea>`); } };
 }
