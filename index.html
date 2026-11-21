@@ -92,9 +92,12 @@ ol.steps img{width:100%;border-radius:10px;margin-top:8px}
 .photo-pick{display:flex;align-items:center;gap:10px}
 .photo-pick input[type=file]{flex:1;min-width:0;max-width:100%}
 .photo-pick .btn{flex:none}
-.photo-pick img,.photo-pick video{width:64px;height:64px;object-fit:cover;border-radius:8px;background:#000}
-video.hero{background:#000;object-fit:contain}
-ol.steps video{width:100%;border-radius:10px;margin-top:8px;background:#000;max-height:60vh}
+.photo-pick img{width:64px;height:64px;object-fit:cover;border-radius:8px;background:#e9e3d4}
+.yt{position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#000;margin-top:8px}
+.yt iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.yt.hero{margin:0 0 12px;border-radius:var(--r)}
+.yt-prev{display:flex;align-items:center;gap:10px;margin-top:6px}
+.yt-prev img{width:96px;aspect-ratio:16/9;object-fit:cover;border-radius:6px}
 .media-tag{position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.65);color:#fff;font:600 .7rem/1 Inter;padding:3px 5px;border-radius:5px}
 .thumb{position:relative}
 .req{color:#b3412e}
@@ -143,9 +146,30 @@ const view = $("#view");
 function toast(msg, ms=2600){ const t=document.createElement("div"); t.className="toast"; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(), ms); }
 function sheet(html){ const s=document.createElement("div"); s.className="sheet"; s.innerHTML=`<div><div class="grab"></div>${html}</div>`; s.addEventListener("click", e=>{ if(e.target===s) s.remove(); }); document.body.appendChild(s); return s; }
 const flyPhotoUrl = p => p ? sb.storage.from("fly-photos").getPublicUrl(p).data.publicUrl : null;
-const flyVideoUrl = p => p ? sb.storage.from("fly-videos").getPublicUrl(p).data.publicUrl : null;
-const isVideo = f => f && (/^video\//.test(f.type) || /\.(mp4|mov|m4v|webm|3gp)$/i.test(f.name||""));
-const MAX_VIDEO_MB = 50;
+// YouTube links: accept watch, youtu.be, shorts, embed and live URLs, with an optional start time (t=90 or t=1m30s).
+function ytParse(u){
+  try{
+    const url = new URL(String(u||"").trim());
+    const host = url.hostname.replace(/^(www\.|m\.|music\.)/,"");
+    let id = null;
+    if(host==="youtu.be") id = url.pathname.slice(1).split("/")[0];
+    else if(/^youtube(-nocookie)?\.com$/.test(host)){
+      if(url.pathname==="/watch") id = url.searchParams.get("v");
+      else { const m = url.pathname.match(/^\/(shorts|embed|live|v)\/([^/?#]+)/); if(m) id = m[2]; }
+    }
+    if(!id || !/^[\w-]{11}$/.test(id)) return null;
+    const t = url.searchParams.get("t") || url.searchParams.get("start") || (url.hash.match(/t=([\dhms]+)/)||[])[1] || "";
+    let start = 0;
+    if(/^\d+$/.test(t)) start = +t;
+    else { const m = t.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/); if(m) start = (+m[1]||0)*3600 + (+m[2]||0)*60 + (+m[3]||0); }
+    return { id, start };
+  }catch{ return null; }
+}
+const ytCanon = u => { const p = ytParse(u); return p ? `https://www.youtube.com/watch?v=${p.id}${p.start?`&t=${p.start}s`:""}` : null; };
+const ytThumb = u => { const p = ytParse(u); return p ? `https://i.ytimg.com/vi/${p.id}/hqdefault.jpg` : null; };
+const ytEmbed = (u, cls="") => { const p = ytParse(u); if(!p) return "";
+  return `<div class="yt ${cls}"><iframe src="https://www.youtube-nocookie.com/embed/${p.id}?rel=0&playsinline=1${p.start?`&start=${p.start}`:""}" title="YouTube video" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`; };
+const flyThumb = f => flyPhotoUrl(f.cover_photo_path) || ytThumb(f.youtube_url) || ytThumb([...(f.fly_steps||[])].sort((a,b)=>a.step_no-b.step_no).find(x=>x.youtube_url)?.youtube_url);
 const uid = () => crypto.randomUUID();
 const fmtDate = d => new Date(d).toLocaleString([], {month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit"});
 function requireUser(){ if(!S.user){ openAuth(); return false; } return true; }
@@ -166,28 +190,6 @@ async function uploadPhoto(bucket, file, max=1600){
   const { error } = await sb.storage.from(bucket).upload(path, blob, { contentType:"image/jpeg" });
   if(error) throw error;
   return path;
-}
-async function uploadVideo(file){
-  if(file.size > MAX_VIDEO_MB*1024*1024) throw new Error(`"${file.name}" is ${(file.size/1048576).toFixed(0)} MB. Videos must be under ${MAX_VIDEO_MB} MB. Trim it or record at 720p.`);
-  const ext = ((file.name||"").match(/\.(\w+)$/)?.[1] || (file.type.split("/")[1]||"mp4")).toLowerCase().replace("quicktime","mov");
-  const type = file.type || (ext==="mov"?"video/quicktime":"video/mp4");
-  const path = `${S.user.id}/${uid()}.${ext}`;
-  const { error } = await sb.storage.from("fly-videos").upload(path, file, { contentType:type });
-  if(error) throw error;
-  return path;
-}
-// Grab a still frame from a video file to use as the recipe's cover photo.
-async function videoPoster(file){
-  const v = document.createElement("video"); v.muted=true; v.playsInline=true; v.preload="auto"; v.src=URL.createObjectURL(file);
-  try{
-    await new Promise((res,rej)=>{ v.onloadeddata=res; v.onerror=rej; setTimeout(rej,15000); });
-    v.currentTime = Math.min(1, (v.duration||2)/2);
-    await new Promise(res=>{ v.onseeked=res; setTimeout(res,4000); });
-    const k = Math.min(1, 1600/Math.max(v.videoWidth, v.videoHeight));
-    const c = document.createElement("canvas"); c.width=Math.round(v.videoWidth*k); c.height=Math.round(v.videoHeight*k);
-    c.getContext("2d").drawImage(v,0,0,c.width,c.height);
-    return await new Promise(r=>c.toBlob(r,"image/jpeg",.85));
-  }catch{ return null; } finally { URL.revokeObjectURL(v.src); }
 }
 async function callFn(name, body){
   const { data, error } = await sb.functions.invoke(name, { body });
@@ -346,10 +348,10 @@ async function renderFlies(){
 }
 function flyCard(f){
   const sp = (f.fly_species||[]).map(x=>speciesById(x.species_id)?.common_name).filter(Boolean);
-  const img = flyPhotoUrl(f.cover_photo_path);
+  const img = flyThumb(f);
   const tie = S.user && S.inventory.length ? (canTie(f) ? `<span class="small have">● Can tie</span>` : "") : "";
   return `<div class="card flycard" data-fly="${f.id}">
-    <div class="thumb" style="${img?`background-image:url('${img}')`:""}">${img?"":FLY_ICON}${f.video_path||(f.fly_steps||[]).some(x=>x.video_path)?`<span class="media-tag">▶ Video</span>`:""}</div>
+    <div class="thumb" style="${img?`background-image:url('${img}')`:""}">${img?"":FLY_ICON}${f.youtube_url||(f.fly_steps||[]).some(x=>x.youtube_url)?`<span class="media-tag">▶ Video</span>`:""}</div>
     <div class="grow">
       <h3>${esc(f.name)}</h3>
       <div class="small muted">${esc(f.fly_type||"")}${f.hook_sizes?` · ${esc(f.hook_sizes.split(";")[0])}`:""} ${tie}</div>
@@ -365,7 +367,7 @@ function openFly(id){
   const mine = S.user && f.author_id===S.user.id;
   const needList = mats.filter(m=>matStatus(m)==="need");
   const s = sheet(`
-    ${f.video_path?`<video class="hero" controls playsinline preload="metadata" src="${flyVideoUrl(f.video_path)}" ${img?`poster="${img}"`:""}></video>`:img?`<img class="hero" src="${img}" alt="">`:""}
+    ${f.youtube_url?ytEmbed(f.youtube_url,"hero"):img?`<img class="hero" src="${img}" alt="">`:""}
     <div class="row"><h2 class="grow">${esc(f.name)}</h2>${mine?`<button class="btn sm alt" id="editF">Edit</button>`:""}</div>
     <div class="small muted" style="margin:4px 0 8px">${esc(f.fly_type||"")} · ${esc(f.difficulty||"")} · Hooks ${esc(f.hook_sizes||"—")}<br>${f.is_starter?"Starter pattern":`Shared by ${esc(f.author?.display_name||"a member")}`}</div>
     <div>${sp.map(x=>`<span class="tag">${esc(x.common_name)}</span>`).join("")}</div>
@@ -377,7 +379,7 @@ function openFly(id){
       ${needList.length?`<button class="btn sm alt" style="margin-top:10px" id="copyNeed">Copy shopping list (${needList.length})</button>`:""}
     </div>
     <div class="card"><h3 style="margin-bottom:10px">Steps</h3>
-      <ol class="steps">${steps.map(st=>`<li>${esc(st.instruction)}${st.photo_path?`<img loading="lazy" src="${flyPhotoUrl(st.photo_path)}" alt="Step ${st.step_no}">`:""}${st.video_path?`<video controls playsinline preload="metadata" src="${flyVideoUrl(st.video_path)}"></video>`:""}</li>`).join("") || `<li class="muted">No steps yet.</li>`}</ol>
+      <ol class="steps">${steps.map(st=>`<li>${esc(st.instruction)}${st.photo_path?`<img loading="lazy" src="${flyPhotoUrl(st.photo_path)}" alt="Step ${st.step_no}">`:""}${st.youtube_url?ytEmbed(st.youtube_url):""}</li>`).join("") || `<li class="muted">No steps yet.</li>`}</ol>
     </div>
     ${(f.tutorial_links||[]).length?`<div class="card"><h3>Watch it tied</h3>${f.tutorial_links.map(l=>`<p style="margin:8px 0 0"><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label||l.url)} ↗</a></p>`).join("")}</div>`:""}
     <button class="btn alt" style="width:100%" id="closeF">Close</button>`);
@@ -388,11 +390,11 @@ function openFly(id){
 
 function editFly(f=null){
   const isNew = !f;
-  f = f || { name:"", fly_type:"", water_type:"salt", hook_sizes:"", difficulty:"beginner", description:"", fishing_tips:"", tutorial_links:[], is_public:true, fly_species:[], fly_materials:[], fly_steps:[], cover_photo_path:null, video_path:null };
+  f = f || { name:"", fly_type:"", water_type:"salt", hook_sizes:"", difficulty:"beginner", description:"", fishing_tips:"", tutorial_links:[], is_public:true, fly_species:[], fly_materials:[], fly_steps:[], cover_photo_path:null, youtube_url:null };
   const mats = [...(f.fly_materials||[])].sort((a,b)=>a.sort-b.sort).map(m=>({...m}));
   const steps = [...(f.fly_steps||[])].sort((a,b)=>a.step_no-b.step_no).map(st=>({...st}));
   const spSel = new Set((f.fly_species||[]).map(x=>x.species_id));
-  let cover = f.cover_photo_path, coverFile=null, video = f.video_path, videoFile=null;
+  let cover = f.cover_photo_path, coverFile=null;
   const links = (f.tutorial_links||[]).map(l=>l.url).join("\n");
   const s = sheet(`<h2>${isNew?"New recipe":"Edit recipe"}</h2>
     <label>Fly name</label><input type="text" id="eName" value="${esc(f.name)}">
@@ -400,10 +402,11 @@ function editFly(f=null){
       <div class="grow"><label>Water</label><select id="eWater">${["salt","fresh","both"].map(w=>`<option ${f.water_type===w?"selected":""} value="${w}">${w==="both"?"Salt + fresh":w[0].toUpperCase()+w.slice(1)}</option>`).join("")}</select></div></div>
     <div class="row"><div class="grow"><label>Hook sizes</label><input type="text" id="eHooks" value="${esc(f.hook_sizes||"")}"></div>
       <div class="grow"><label>Difficulty</label><select id="eDiff">${["beginner","intermediate","advanced"].map(d=>`<option ${f.difficulty===d?"selected":""}>${d}</option>`).join("")}</select></div></div>
-    <div class="card" style="background:#fbf3e2;margin-top:12px"><p class="small" style="margin:0">A shared recipe needs a <b>photo or video</b>, a typed <b>materials list</b> and typed <b>step-by-step instructions</b>. Each step can have its own photo or short video clip.</p></div>
+    <div class="card" style="background:#fbf3e2;margin-top:12px"><p class="small" style="margin:0">A shared recipe needs a <b>photo or a YouTube video</b>, a typed <b>materials list</b> and typed <b>step-by-step instructions</b>. Each step can have its own photo or YouTube link.</p></div>
     <label>Photo of the finished fly</label><div class="photo-pick"><img id="covPrev" src="${cover?flyPhotoUrl(cover):""}" class="${cover?"":"hide"}"><input type="file" accept="image/*" id="eCover"></div>
-    <label>Full tying video (optional, under ${MAX_VIDEO_MB} MB)</label><div class="photo-pick"><video id="vidPrev" muted playsinline class="${video?"":"hide"}" src="${video?flyVideoUrl(video):""}"></video><input type="file" accept="video/*" id="eVideo">${video?`<button class="btn ghost" id="vidDel" title="Remove video">✕</button>`:""}</div>
-    <p class="small muted" style="margin:4px 0 0">No photo? We'll use a frame from the video as the cover.</p>
+    <label>YouTube video of the whole fly being tied (optional)</label><input type="url" id="eYt" inputmode="url" placeholder="https://youtu.be/…" value="${esc(f.youtube_url||"")}">
+    <div class="yt-prev" id="eYtPrev"></div>
+    <p class="small muted" style="margin:4px 0 0">Paste the link from YouTube's Share button. No photo? We'll use the video's thumbnail.</p>
     <label>Target species</label><div class="chips wrap" id="eSp" style="flex-wrap:wrap">${S.species.map(sp=>`<span class="chip ${spSel.has(sp.id)?"on":""}" data-sp="${sp.id}">${esc(sp.common_name.replace(/ \(.+\)/,""))}</span>`).join("")}</div>
     <label>Description</label><textarea id="eDesc">${esc(f.description||"")}</textarea>
     <label>How to fish it</label><textarea id="eTips">${esc(f.fishing_tips||"")}</textarea>
@@ -411,76 +414,67 @@ function editFly(f=null){
     <div id="eMats"></div>
     <div class="row" style="margin-top:14px"><h3 class="grow">Step-by-step instructions <span class="req">*</span></h3><button class="btn sm alt" id="addStep">+ Step</button></div>
     <div id="eSteps"></div>
-    <label>YouTube or other tutorial links (one per line)</label><textarea id="eLinks" placeholder="https://…">${esc(links)}</textarea>
+    <label>Other tutorial links (one per line, optional)</label><textarea id="eLinks" placeholder="https://…">${esc(links)}</textarea>
     <label class="row" style="gap:8px;color:var(--ink);font-size:.9rem"><input type="checkbox" id="ePub" ${f.is_public?"checked":""} style="width:auto"> Share with everyone</label>
-    <p class="small muted">Only upload photos and videos you made yourself. Credit any pattern originator in the description.</p>
+    <p class="small muted">Only upload photos you took yourself, and only link videos that are public on YouTube. Credit any pattern originator in the description.</p>
     <div class="row" style="margin-top:12px"><button class="btn grow" id="eSave">Save recipe</button>${!isNew?`<button class="btn danger" id="eDel">Delete</button>`:""}</div>`);
   const drawMats = () => { $("#eMats",s).innerHTML = mats.map((m,i)=>`<div class="edit-row" data-i="${i}">
       <div class="row"><input type="text" placeholder="Part (tail, body…)" data-k="part" value="${esc(m.part||"")}" style="flex:1"><select data-k="category" style="flex:1">${CATEGORIES.map(c=>`<option value="${c}" ${m.category===c?"selected":""}>${CAT_LABEL[c]}</option>`).join("")}</select></div>
       <div class="row" style="margin-top:6px"><input type="text" placeholder="Material (e.g. Bucktail, chartreuse)" data-k="material_text" value="${esc(m.material_text||"")}"><button class="btn ghost" data-del>✕</button></div></div>`).join("") || `<p class="small muted">No materials yet.</p>`;
     $("#eMats",s).querySelectorAll(".edit-row").forEach(r=>{ const i=+r.dataset.i; r.querySelectorAll("[data-k]").forEach(inp=>inp.oninput=inp.onchange=()=>mats[i][inp.dataset.k]=inp.value); r.querySelector("[data-del]").onclick=()=>{ mats.splice(i,1); drawMats(); }; }); };
-  const stepMedia = st => {
-    if(st._file) return isVideo(st._file) ? `<video muted playsinline src="${st._preview}"></video>` : `<img src="${st._preview}">`;
-    if(st.video_path) return `<video muted playsinline preload="metadata" src="${flyVideoUrl(st.video_path)}"></video>`;
-    if(st.photo_path) return `<img src="${flyPhotoUrl(st.photo_path)}">`;
-    return ""; };
   const drawSteps = () => { $("#eSteps",s).innerHTML = steps.map((st,i)=>`<div class="edit-row" data-i="${i}">
       <div class="row"><b>${i+1}.</b><span class="grow"></span><button class="btn ghost" data-up ${i===0?"disabled":""}>↑</button><button class="btn ghost" data-del>✕</button></div>
       <textarea data-k="instruction" placeholder="What to do in this step">${esc(st.instruction||"")}</textarea>
-      <div class="photo-pick" style="margin-top:6px">${stepMedia(st)}<input type="file" accept="image/*,video/*" data-photo>${st.photo_path||st.video_path||st._file?`<button class="btn ghost" data-mdel title="Remove photo/video">✕</button>`:""}</div>
-      <div class="small muted">Photo or short video clip for this step (optional)</div></div>`).join("") || `<p class="small muted">No steps yet.</p>`;
+      <div class="photo-pick" style="margin-top:6px"><img class="${st.photo_path||st._preview?"":"hide"}" src="${st._preview || (st.photo_path?flyPhotoUrl(st.photo_path):"")}"><input type="file" accept="image/*" data-photo>${st.photo_path||st._file?`<button class="btn ghost" data-mdel title="Remove photo">✕</button>`:""}</div>
+      <input type="url" inputmode="url" data-yt placeholder="YouTube link for this step (optional)" value="${esc(st.youtube_url||"")}" style="margin-top:6px">
+      <div class="small muted">Tip: on YouTube, tick "Start at" when you share so the link jumps to this step.</div></div>`).join("") || `<p class="small muted">No steps yet.</p>`;
     $("#eSteps",s).querySelectorAll(".edit-row").forEach(r=>{ const i=+r.dataset.i;
       r.querySelector("[data-k]").oninput=e=>steps[i].instruction=e.target.value;
       r.querySelector("[data-del]").onclick=()=>{ steps.splice(i,1); drawSteps(); };
       r.querySelector("[data-up]").onclick=()=>{ [steps[i-1],steps[i]]=[steps[i],steps[i-1]]; drawSteps(); };
       r.querySelector("[data-photo]").onchange=e=>{ const file=e.target.files[0]; if(!file) return;
-        if(isVideo(file) && file.size > MAX_VIDEO_MB*1048576){ e.target.value=""; return toast(`That video is ${(file.size/1048576).toFixed(0)} MB. Keep step clips under ${MAX_VIDEO_MB} MB.`, 4500); }
         steps[i]._file=file; steps[i]._preview=URL.createObjectURL(file); drawSteps(); };
-      const md=r.querySelector("[data-mdel]"); if(md) md.onclick=()=>{ Object.assign(steps[i], {_file:null,_preview:null,photo_path:null,video_path:null}); drawSteps(); }; }); };
+      const md=r.querySelector("[data-mdel]"); if(md) md.onclick=()=>{ Object.assign(steps[i], {_file:null,_preview:null,photo_path:null}); drawSteps(); };
+      r.querySelector("[data-yt]").oninput=e=>steps[i].youtube_url=e.target.value.trim(); }); };
   drawMats(); drawSteps();
   $("#addMat",s).onclick=()=>{ mats.push({part:"",material_text:"",category:"other"}); drawMats(); };
   $("#addStep",s).onclick=()=>{ steps.push({instruction:""}); drawSteps(); };
   $("#eSp",s).querySelectorAll("[data-sp]").forEach(c=>c.onclick=()=>{ const id=+c.dataset.sp; spSel.has(id)?spSel.delete(id):spSel.add(id); c.classList.toggle("on"); });
   $("#eCover",s).onchange=e=>{ coverFile=e.target.files[0]; if(coverFile){ const p=$("#covPrev",s); p.src=URL.createObjectURL(coverFile); p.classList.remove("hide"); } };
-  $("#eVideo",s).onchange=e=>{ const file=e.target.files[0]; if(!file) return;
-    if(file.size > MAX_VIDEO_MB*1048576){ e.target.value=""; return toast(`That video is ${(file.size/1048576).toFixed(0)} MB. Videos must be under ${MAX_VIDEO_MB} MB. Trim it or record at 720p.`, 5000); }
-    videoFile=file; const p=$("#vidPrev",s); p.src=URL.createObjectURL(file); p.classList.remove("hide"); };
-  if($("#vidDel",s)) $("#vidDel",s).onclick=e=>{ video=null; videoFile=null; $("#vidPrev",s).classList.add("hide"); $("#eVideo",s).value=""; e.target.remove(); };
+  const ytPrev=()=>{ const u=$("#eYt",s).value.trim(), t=ytThumb(u), box=$("#eYtPrev",s);
+    box.innerHTML = !u ? "" : t ? `<img src="${t}" alt=""><span class="small have">✓ YouTube video found</span>` : `<span class="small" style="color:#b3412e">That doesn't look like a YouTube link</span>`; };
+  $("#eYt",s).oninput=ytPrev; ytPrev();
   if($("#eDel",s)) $("#eDel",s).onclick=async()=>{ if(!confirm("Delete this recipe?")) return; const { error } = await sb.from("flies").delete().eq("id", f.id); if(error) return toast(error.message); s.remove(); S.flies=null; toast("Deleted"); renderFlies(); };
   $("#eSave",s).onclick=async()=>{
     const name=$("#eName",s).value.trim(); if(!name) return toast("Give the fly a name");
     if(!mats.some(x=>x.material_text?.trim())) return toast("Add at least one material to the materials list", 3500);
     if(!steps.some(x=>x.instruction?.trim())) return toast("Type at least one step-by-step instruction", 3500);
-    if(steps.some(x=>(x._file||x.photo_path||x.video_path) && !x.instruction?.trim())) return toast("Every step with a photo or video needs typed instructions", 4000);
-    const hasMedia = cover || coverFile || video || videoFile || steps.some(x=>x._file||x.photo_path||x.video_path);
-    if($("#ePub",s).checked && !hasMedia) return toast("Add a photo or video before sharing this recipe", 3500);
+    const yt=$("#eYt",s).value.trim();
+    if(yt && !ytParse(yt)) return toast("The full-video link isn't a YouTube link. Copy it from YouTube's Share button.", 4500);
+    const badStep = steps.findIndex(x=>x.youtube_url && !ytParse(x.youtube_url));
+    if(badStep>=0) return toast(`Step ${badStep+1}'s video link isn't a YouTube link`, 4000);
+    if(steps.some(x=>(x._file||x.photo_path||x.youtube_url) && !x.instruction?.trim())) return toast("Every step with a photo or video needs typed instructions", 4000);
+    const hasMedia = cover || coverFile || yt || steps.some(x=>x._file||x.photo_path||x.youtube_url);
+    if($("#ePub",s).checked && !hasMedia) return toast("Add a photo or a YouTube link before sharing this recipe", 3500);
     const btn=$("#eSave",s); btn.disabled=true;
     const busy = t => btn.innerHTML=`<span class="spinner"></span> ${t}`;
     busy("Saving…");
     try{
       if(coverFile){ busy("Uploading photo…"); cover = await uploadPhoto("fly-photos", coverFile); }
-      if(videoFile){
-        busy("Uploading video… keep this screen open"); video = await uploadVideo(videoFile);
-        if(!cover){ const still = await videoPoster(videoFile); if(still){ const path=`${S.user.id}/${uid()}.jpg`; const { error } = await sb.storage.from("fly-photos").upload(path, still, { contentType:"image/jpeg" }); if(!error) cover=path; } }
-      }
       let n=0; const total=steps.filter(x=>x._file).length;
-      for(const st of steps){ if(st._file){ n++; busy(`Uploading step media ${n} of ${total}…`);
-        if(isVideo(st._file)){ st.video_path = await uploadVideo(st._file); st.photo_path = null;
-          if(!cover){ const still = await videoPoster(st._file); if(still){ const path=`${S.user.id}/${uid()}.jpg`; const { error } = await sb.storage.from("fly-photos").upload(path, still, { contentType:"image/jpeg" }); if(!error) cover=path; } } }
-        else { st.photo_path = await uploadPhoto("fly-photos", st._file); st.video_path = null; }
-        st._file=null; } }
+      for(const st of steps){ if(st._file){ n++; busy(`Uploading step photo ${n} of ${total}…`); st.photo_path = await uploadPhoto("fly-photos", st._file); st._file=null; } }
       if(!cover){ const firstPhoto = steps.find(x=>x.photo_path); if(firstPhoto) cover = firstPhoto.photo_path; }
       busy("Saving recipe…");
       const row = { name, fly_type:$("#eType",s).value.trim(), water_type:$("#eWater",s).value, hook_sizes:$("#eHooks",s).value.trim(),
         difficulty:$("#eDiff",s).value, description:$("#eDesc",s).value.trim(), fishing_tips:$("#eTips",s).value.trim(),
         tutorial_links: $("#eLinks",s).value.split(/\s+/).filter(u=>/^https?:\/\//.test(u)).map(url=>({label:url.replace(/^https?:\/\/(www\.)?/,"").split("/")[0], url})),
-        is_public:$("#ePub",s).checked, cover_photo_path:cover, video_path:video };
+        is_public:$("#ePub",s).checked, cover_photo_path:cover, youtube_url:yt?ytCanon(yt):null };
       let id = f.id;
       if(isNew){ const { data, error } = await sb.from("flies").insert(row).select("id").single(); if(error) throw error; id=data.id; }
       else { const { error } = await sb.from("flies").update(row).eq("id", id); if(error) throw error;
         await Promise.all([sb.from("fly_materials").delete().eq("fly_id",id), sb.from("fly_steps").delete().eq("fly_id",id), sb.from("fly_species").delete().eq("fly_id",id)]); }
       const m = mats.filter(x=>x.material_text?.trim()).map((x,i)=>({ fly_id:id, part:x.part||null, material_text:x.material_text.trim(), category:x.category||"other", material_id:x.material_id||null, sort:i+1 }));
-      const st = steps.filter(x=>x.instruction?.trim()).map((x,i)=>({ fly_id:id, step_no:i+1, instruction:x.instruction.trim(), photo_path:x.photo_path||null, video_path:x.video_path||null }));
+      const st = steps.filter(x=>x.instruction?.trim()).map((x,i)=>({ fly_id:id, step_no:i+1, instruction:x.instruction.trim(), photo_path:x.photo_path||null, youtube_url:x.youtube_url?ytCanon(x.youtube_url):null }));
       const sp = [...spSel].map(species_id=>({ fly_id:id, species_id }));
       for(const [t, rows] of [["fly_materials",m],["fly_steps",st],["fly_species",sp]]) if(rows.length){ const { error } = await sb.from(t).insert(rows); if(error) throw error; }
       s.remove(); S.flies=null; toast("Recipe saved"); await renderFlies(); openFly(id);
