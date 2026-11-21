@@ -1,4 +1,4 @@
-# Fly Bench — flytyingrecipes.org
+# Fly Bench — app.flytyingrecipes.org
 
 Fly tying recipes sorted by fish species, a materials inventory with phone barcode scanning,
 and a fish log with GPS, photo species ID and Florida (FWC) regulations.
