@@ -1,0 +1,24 @@
+{
+  "id": "/",
+  "name": "Fly Bench: Fly Tying Recipes & Fish Log",
+  "short_name": "Fly Bench",
+  "description": "Fly tying recipes sorted by the fish you're after, a materials inventory with barcode scanning, and a fish log with GPS, species ID and current Florida regulations.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4efe4",
+  "theme_color": "#123b3a",
+  "lang": "en-US",
+  "dir": "ltr",
+  "categories": ["sports", "lifestyle", "education"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Share a recipe", "url": "/#new", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#123b3a">
 <title>Fly Bench · Florida Fishing</title>
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -292,12 +293,23 @@ function openAccount(){
     <p class="muted small">${esc(S.user.email)}</p>
     <label>Display name</label><input type="text" id="dn" value="${esc(S.profile?.display_name||"")}">
     <div class="row" style="margin-top:12px"><button class="btn" id="saveDn">Save</button><button class="btn alt" id="out">Sign out</button></div>
-    <p class="small muted" id="aiLeft"></p>`);
+    <p class="small muted" id="aiLeft"></p>
+    <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+    <p class="small"><a href="/privacy.html" target="_blank" rel="noopener">Privacy policy</a></p>
+    <button class="btn danger" id="delAcct" style="width:100%">Delete my account</button>
+    <p class="small muted" style="margin-top:6px">Permanently deletes your login, recipes, materials inventory and fish log.</p>`);
   sb.from("ai_usage").select("count").eq("day", new Date().toISOString().slice(0,10)).maybeSingle().then(({data})=>{ $("#aiLeft",s).textContent = `Photo IDs used today: ${data?.count||0} of 20`; });
   $("#saveDn",s).onclick = async()=>{ await sb.from("profiles").update({display_name:$("#dn",s).value.trim()}).eq("id",S.user.id); await refreshUser(); s.remove(); toast("Saved"); };
   $("#out",s).onclick = async()=>{ await sb.auth.signOut(); s.remove(); await afterAuth(); };
+  $("#delAcct",s).onclick = async()=>{
+    const typed = prompt("This permanently deletes your account, all your recipes (including shared ones), your materials inventory and your fish log. It can't be undone.\n\nType DELETE to confirm.");
+    if(typed !== "DELETE"){ if(typed!==null) toast("Not deleted. You must type DELETE."); return; }
+    const b=$("#delAcct",s); b.disabled=true; b.innerHTML=`<span class="spinner"></span> Deleting…`;
+    try{ await callFn("delete-account", { confirm:"DELETE" }); await sb.auth.signOut(); s.remove(); S.flies=null; await afterAuth(); toast("Your account and data were deleted", 4000); }
+    catch(err){ toast(err.message||"Delete failed", 4000); b.disabled=false; b.textContent="Delete my account"; }
+  };
 }
-async function afterAuth(){ await refreshUser(); S.catches=null; await loadInventory(); render(); if(S.pendingNew && S.user){ S.pendingNew=false; editFly(); } }
+async function afterAuth(){ await refreshUser(); S.catches=null; await loadInventory(); render(); if(S.pendingNew && S.user){ S.pendingNew=false; editFly(); } if(S.pendingAccount && S.user){ S.pendingAccount=false; openAccount(); } }
 $("#acctBtn").onclick = openAccount;
 
 /* ---------------- tabs ---------------- */
@@ -804,6 +816,9 @@ sb.auth.onAuthStateChange((evt)=>{ if(evt==="SIGNED_IN"||evt==="SIGNED_OUT") aft
   view.innerHTML=`<div class="empty"><span class="spinner"></span></div>`;
   await Promise.all([refreshUser(), loadBase()]);
   await loadInventory();
+  if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("/sw.js").catch(()=>{});
+  const wantDelete = location.hash==="#delete-account";
+  if(wantDelete){ history.replaceState(null,"",location.pathname); if(S.user) openAccount(); else { S.pendingAccount=true; openAuth(); } }
   const wantNew = location.hash==="#new";
   if(wantNew){ history.replaceState(null,"",location.pathname); S.tab="flies"; document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("on",x.dataset.tab==="flies")); }
   await render();
