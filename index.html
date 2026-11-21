@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#123b3a">
+<title>Fly Bench · Florida Fishing</title>
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{
+  --ink:#16231f; --muted:#5d6b66; --paper:#f6f2e9; --card:#fffdf8; --line:#e2dccd;
+  --teal:#123b3a; --teal2:#1f5c59; --brass:#b9852f; --red:#b4452f; --green:#2f7a4a; --amber:#b9852f;
+  --r:14px; --shadow:0 1px 2px rgba(0,0,0,.05),0 4px 14px rgba(18,59,58,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 Inter,system-ui,sans-serif;-webkit-text-size-adjust:100%}
+h1,h2,h3{font-family:Fraunces,Georgia,serif;font-weight:700;margin:0;letter-spacing:-.01em}
+h1{font-size:1.5rem} h2{font-size:1.25rem} h3{font-size:1.05rem}
+a{color:var(--teal2)}
+button,input,select,textarea{font:inherit;color:inherit}
+header.top{position:sticky;top:0;z-index:20;background:var(--teal);color:#fff;padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;display:flex;align-items:center;gap:10px}
+header.top h1{font-size:1.25rem;flex:1}
+header.top .sub{font:500 .75rem Inter;opacity:.7;letter-spacing:.08em;text-transform:uppercase}
+header.top button{background:rgba(255,255,255,.12);border:0;color:#fff;border-radius:999px;padding:6px 12px;font-size:.85rem}
+main{padding:14px 14px calc(90px + env(safe-area-inset-bottom));max-width:760px;margin:0 auto}
+nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:30;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+nav.tabs button{flex:1;background:none;border:0;padding:9px 0 8px;font-size:.72rem;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px}
+nav.tabs button svg{width:22px;height:22px}
+nav.tabs button.on{color:var(--teal)}
+nav.tabs button.on svg{stroke:var(--brass)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:14px;margin-bottom:12px}
+.row{display:flex;gap:8px;align-items:center}
+.wrap{flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.muted{color:var(--muted)} .small{font-size:.82rem}
+.btn{border:0;border-radius:10px;padding:10px 14px;background:var(--teal);color:#fff;font-weight:600;cursor:pointer}
+.btn.alt{background:#e9e3d4;color:var(--ink)}
+.btn.brass{background:var(--brass)}
+.btn.ghost{background:none;color:var(--teal2);padding:6px 8px}
+.btn.danger{background:var(--red)}
+.btn.sm{padding:6px 10px;font-size:.85rem;border-radius:8px}
+.btn:disabled{opacity:.5}
+.fab{position:fixed;right:16px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:25;border-radius:999px;padding:14px 18px;box-shadow:0 6px 18px rgba(0,0,0,.2)}
+input[type=text],input[type=email],input[type=password],input[type=number],input[type=search],input[type=datetime-local],select,textarea{width:100%;border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 12px}
+textarea{min-height:80px;resize:vertical}
+label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin:10px 0 4px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font-size:.85rem;white-space:nowrap;cursor:pointer}
+.chip.on{background:var(--teal);border-color:var(--teal);color:#fff}
+.tag{display:inline-block;font-size:.72rem;background:#eee7d6;border-radius:6px;padding:2px 7px;margin:2px 4px 2px 0}
+.tag.salt{background:#dbe9ea} .tag.fresh{background:#e3ecd9}
+.flycard{display:flex;gap:12px;align-items:center;cursor:pointer}
+.thumb{width:64px;height:64px;border-radius:10px;background:#e9e3d4 center/cover no-repeat;flex:none;display:grid;place-items:center;color:var(--brass)}
+.thumb svg{width:30px;height:30px}
+.have{color:var(--green)} .maybe{color:var(--amber)} .need{color:var(--red)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.dot.have{background:var(--green)} .dot.maybe{background:var(--amber)} .dot.need{background:var(--red)}
+ol.steps{padding-left:0;list-style:none;counter-reset:s;margin:0}
+ol.steps li{counter-increment:s;position:relative;padding:0 0 14px 40px}
+ol.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:var(--teal);color:#fff;font:600 .85rem/28px Inter;text-align:center}
+ol.steps img{width:100%;border-radius:10px;margin-top:8px}
+.hero{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:var(--r);margin-bottom:12px;background:#e9e3d4}
+.qty{display:flex;align-items:center;gap:6px}
+.qty button{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:#fff;font-size:1.1rem;font-weight:600}
+.qty b{min-width:30px;text-align:center}
+.low{background:#fbeee2;border-color:#f0d3b8}
+.sheet{position:fixed;inset:0;z-index:50;background:rgba(10,20,20,.45);display:flex;align-items:flex-end;justify-content:center}
+.sheet>div{background:var(--paper);width:100%;max-width:760px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom))}
+.sheet .grab{width:40px;height:4px;background:var(--line);border-radius:4px;margin:0 auto 10px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;z-index:80;font-size:.9rem;max-width:90vw;text-align:center}
+#scanner{position:fixed;inset:0;z-index:60;background:#000;display:flex;flex-direction:column}
+#scanner video{flex:1;width:100%;object-fit:cover}
+#scanner .frame{position:absolute;left:10%;right:10%;top:35%;height:22%;border:3px solid var(--brass);border-radius:12px;box-shadow:0 0 0 2000px rgba(0,0,0,.35)}
+#scanner .bar{position:absolute;left:0;right:0;bottom:0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));background:linear-gradient(transparent,rgba(0,0,0,.85));color:#fff}
+#scanner .modes{display:flex;gap:6px;margin-bottom:10px}
+#scanner .modes .chip{background:rgba(255,255,255,.15);color:#fff;border-color:transparent}
+#scanner .modes .chip.on{background:var(--brass)}
+#map{height:360px;border-radius:var(--r);border:1px solid var(--line)}
+.reg dt{font-size:.75rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:8px}
+.reg dd{margin:2px 0 0}
+.ai{border-left:4px solid var(--brass)}
+.empty{text-align:center;padding:30px 10px;color:var(--muted)}
+.seg{display:flex;background:#e9e3d4;border-radius:10px;padding:3px;margin-bottom:12px}
+.seg button{flex:1;border:0;background:none;padding:7px;border-radius:8px;font-weight:600;font-size:.88rem;color:var(--muted)}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+.edit-row{border:1px dashed var(--line);border-radius:10px;padding:10px;margin-bottom:8px;background:#fff}
+.photo-pick{display:flex;align-items:center;gap:10px}
+.photo-pick img{width:64px;height:64px;object-fit:cover;border-radius:8px}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-3px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="grow"><div class="sub">Florida Fishing</div><h1>Fly Bench</h1></div>
+  <button id="acctBtn">Sign in</button>
+</header>
+<main id="view"></main>
+<nav class="tabs" id="tabs">
+  <button data-tab="flies" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20c6-1 10-5 12-12"/><path d="M16 8c2-1 3-3 4-5-2 1-4 2-5 4"/><path d="M8 16c-2-2-3-5-2-9 3 1 5 3 6 6"/><circle cx="17" cy="7" r="1"/></svg>Flies</button>
+  <button data-tab="inventory"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v6M15 4v6"/></svg>Materials</button>
+  <button data-tab="log"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12c3-4 7-6 11-6 4 0 7 3 9 6-2 3-5 6-9 6-4 0-8-2-11-6z"/><circle cx="16" cy="11" r="1"/><path d="M2 12l-0 0M2 9l3 3-3 3"/></svg>Fish Log</button>
+  <button data-tab="species"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>Regs</button>
+</nav>
+
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+/* ---------------- config ---------------- */
+const SUPABASE_URL = "https://rkxzfzzjzrnkiyopbdke.supabase.co";
+const SUPABASE_KEY = "sb_publishable_ypQ91HrykMCwgI59OCRFYg_MFGOgzi9";
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const CATEGORIES = ["hook","thread","eyes","hair","feather","fur","flash","synthetic","body","dubbing","foam","legs","yarn","wire","glue","tool","other"];
+const CAT_LABEL = {hook:"Hooks",thread:"Thread",eyes:"Eyes & beads",hair:"Hair (bucktail, calf)",feather:"Feathers & hackle",fur:"Fur & rabbit",flash:"Flash & tinsel",synthetic:"Synthetic fibers",body:"Body (chenille, tubing)",dubbing:"Dubbing",foam:"Foam",legs:"Rubber legs",yarn:"Yarn",wire:"Wire",glue:"Glue & resin",tool:"Tools",other:"Other"};
+const FLY_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 20c6-1 10-5 12-12"/><path d="M16 8c2-1 3-3 4-5-2 1-4 2-5 4"/><path d="M8 16c-2-2-3-5-2-9 3 1 5 3 6 6"/></svg>`;
+const FISH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 12c3-4 7-6 11-6 4 0 7 3 9 6-2 3-5 6-9 6-4 0-8-2-11-6z"/><circle cx="16" cy="11" r="1"/></svg>`;
+
+/* ---------------- state ---------------- */
+const S = {
+  user:null, profile:null, tab:"flies",
+  species:[], regs:{}, flies:null, inventory:[], catches:null,
+  flyFilter:{species:"", water:"", q:"", canTie:false, mine:false},
+};
+
+/* ---------------- helpers ---------------- */
+const $ = (sel, el=document) => el.querySelector(sel);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const view = $("#view");
+function toast(msg, ms=2600){ const t=document.createElement("div"); t.className="toast"; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(), ms); }
+function sheet(html){ const s=document.createElement("div"); s.className="sheet"; s.innerHTML=`<div><div class="grab"></div>${html}</div>`; s.addEventListener("click", e=>{ if(e.target===s) s.remove(); }); document.body.appendChild(s); return s; }
+const flyPhotoUrl = p => p ? sb.storage.from("fly-photos").getPublicUrl(p).data.publicUrl : null;
+const uid = () => crypto.randomUUID();
+const fmtDate = d => new Date(d).toLocaleString([], {month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit"});
+function requireUser(){ if(!S.user){ openAuth(); return false; } return true; }
+
+async function resizeImage(file, max=1600, quality=.85){
+  const img = await new Promise((res, rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=URL.createObjectURL(file); });
+  const k = Math.min(1, max/Math.max(img.width, img.height));
+  const c = document.createElement("canvas"); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+  c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+  URL.revokeObjectURL(img.src);
+  const blob = await new Promise(r=>c.toBlob(r, "image/jpeg", quality));
+  const dataUrl = c.toDataURL("image/jpeg", quality);
+  return { blob, dataUrl };
+}
+async function uploadPhoto(bucket, file, max=1600){
+  const { blob } = await resizeImage(file, max);
+  const path = `${S.user.id}/${uid()}.jpg`;
+  const { error } = await sb.storage.from(bucket).upload(path, blob, { contentType:"image/jpeg" });
+  if(error) throw error;
+  return path;
+}
+async function callFn(name, body){
+  const { data, error } = await sb.functions.invoke(name, { body });
+  if(error){
+    let msg = "Something went wrong.";
+    try { const j = await error.context.json(); msg = j.message || j.error || msg; } catch {}
+    throw new Error(msg);
+  }
+  return data;
+}
+
+/* ---------------- data loading ---------------- */
+async function loadBase(){
+  const [{ data: sp }, { data: rg }] = await Promise.all([
+    sb.from("species").select("*").order("sort_order"),
+    sb.from("regulations").select("*"),
+  ]);
+  S.species = sp || [];
+  S.regs = {}; (rg||[]).forEach(r => (S.regs[r.species_id] ||= []).push(r));
+}
+async function loadFlies(){
+  const { data, error } = await sb.from("flies")
+    .select("*, fly_species(species_id), fly_materials(*), fly_steps(*), author:profiles!flies_author_profile_fk(display_name)")
+    .order("is_starter", { ascending:false }).order("name");
+  if(error){ console.error(error); toast("Couldn't load flies"); S.flies=[]; return; }
+  S.flies = data;
+}
+async function loadInventory(){
+  if(!S.user){ S.inventory=[]; return; }
+  const { data, error } = await sb.from("inventory").select("*, material:materials(*)").order("updated_at", {ascending:false});
+  if(error) console.error(error);
+  S.inventory = data || [];
+}
+async function loadCatches(){
+  if(!S.user){ S.catches=[]; return; }
+  const { data } = await sb.from("catches").select("*").order("caught_at", {ascending:false});
+  S.catches = data || [];
+  const paths = S.catches.map(c=>c.photo_path).filter(Boolean);
+  if(paths.length){
+    const { data: urls } = await sb.storage.from("catch-photos").createSignedUrls(paths, 3600);
+    const m = {}; (urls||[]).forEach(u => m[u.path] = u.signedUrl);
+    S.catches.forEach(c => c.photo_url = m[c.photo_path]);
+  }
+}
+const speciesById = id => S.species.find(s=>s.id===id);
+
+/* ---------------- material matching ---------------- */
+const STOP = new Set("with plus and the for or optional small medium large size sizes color colour e.g. similar sparse white black tan olive pink red few strands strand pair pairs".split(" "));
+const words = s => (s||"").toLowerCase().replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(w=>w.length>=4 && !STOP.has(w));
+function matStatus(fm){
+  if(!S.user || !S.inventory.length) return null;
+  const stocked = S.inventory.filter(i => Number(i.quantity) > 0);
+  if(fm.material_id && stocked.some(i=>i.material_id===fm.material_id)) return "have";
+  const w = words(fm.material_text);
+  const hit = stocked.find(i => { const iw = words(`${i.material.name} ${i.material.brand||""}`); return iw.some(x=>w.includes(x)); });
+  if(hit) return "have";
+  if(fm.category && stocked.some(i => i.material.category === fm.category)) return "maybe";
+  return "need";
+}
+function canTie(f){ if(!S.user) return false; return (f.fly_materials||[]).every(m => matStatus(m) !== "need"); }
+
+/* ---------------- auth ---------------- */
+async function refreshUser(){
+  const { data: { session } } = await sb.auth.getSession();
+  S.user = session?.user || null;
+  if(S.user){ const { data } = await sb.from("profiles").select("*").eq("id", S.user.id).maybeSingle(); S.profile = data; }
+  else S.profile = null;
+  $("#acctBtn").textContent = S.user ? (S.profile?.display_name || "Account") : "Sign in";
+}
+function openAuth(){
+  const s = sheet(`
+    <h2>Sign in</h2>
+    <p class="muted small">Browse flies without an account. Sign in to track materials, log fish and share your own recipes.</p>
+    <div class="seg"><button class="on" data-m="in">Sign in</button><button data-m="up">Create account</button></div>
+    <div id="nameWrap" class="hide"><label>Display name</label><input type="text" id="aName" placeholder="What others see on your recipes"></div>
+    <label>Email</label><input type="email" id="aEmail" autocomplete="email">
+    <label>Password</label><input type="password" id="aPass" autocomplete="current-password">
+    <div class="row" style="margin-top:14px"><button class="btn grow" id="aGo">Sign in</button></div>
+    <p class="small"><a href="#" id="aForgot">Forgot password?</a></p>`);
+  let mode="in";
+  s.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{ mode=b.dataset.m; s.querySelectorAll(".seg button").forEach(x=>x.classList.toggle("on", x===b)); $("#nameWrap",s).classList.toggle("hide", mode==="in"); $("#aGo",s).textContent = mode==="in"?"Sign in":"Create account"; });
+  $("#aGo",s).onclick = async () => {
+    const email=$("#aEmail",s).value.trim(), password=$("#aPass",s).value;
+    if(!email || password.length<6) return toast("Enter email and a password of 6+ characters");
+    $("#aGo",s).disabled=true;
+    const redirect = location.origin + location.pathname;
+    const r = mode==="in"
+      ? await sb.auth.signInWithPassword({ email, password })
+      : await sb.auth.signUp({ email, password, options:{ data:{ display_name:$("#aName",s).value.trim() || email.split("@")[0] }, emailRedirectTo: redirect } });
+    $("#aGo",s).disabled=false;
+    if(r.error) return toast(r.error.message, 4000);
+    if(mode==="up" && !r.data.session){ s.remove(); return toast("Check your email to confirm your account", 5000); }
+    s.remove(); await afterAuth();
+  };
+  $("#aForgot",s).onclick = async e => { e.preventDefault(); const email=$("#aEmail",s).value.trim(); if(!email) return toast("Enter your email first"); await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin+location.pathname }); toast("Password reset email sent"); };
+}
+function openAccount(){
+  if(!S.user) return openAuth();
+  const s = sheet(`<h2>Account</h2>
+    <p class="muted small">${esc(S.user.email)}</p>
+    <label>Display name</label><input type="text" id="dn" value="${esc(S.profile?.display_name||"")}">
+    <div class="row" style="margin-top:12px"><button class="btn" id="saveDn">Save</button><button class="btn alt" id="out">Sign out</button></div>
+    <p class="small muted" id="aiLeft"></p>`);
+  sb.from("ai_usage").select("count").eq("day", new Date().toISOString().slice(0,10)).maybeSingle().then(({data})=>{ $("#aiLeft",s).textContent = `Photo IDs used today: ${data?.count||0} of 20`; });
+  $("#saveDn",s).onclick = async()=>{ await sb.from("profiles").update({display_name:$("#dn",s).value.trim()}).eq("id",S.user.id); await refreshUser(); s.remove(); toast("Saved"); };
+  $("#out",s).onclick = async()=>{ await sb.auth.signOut(); s.remove(); await afterAuth(); };
+}
+async function afterAuth(){ await refreshUser(); S.catches=null; await loadInventory(); render(); }
+$("#acctBtn").onclick = openAccount;
+
+/* ---------------- tabs ---------------- */
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => { S.tab=b.dataset.tab; document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("on",x===b)); render(); window.scrollTo(0,0); });
+function setTab(t){ S.tab=t; document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("on",x.dataset.tab===t)); render(); window.scrollTo(0,0); }
+document.querySelectorAll(".fab").forEach(f=>f.remove());
+async function render(){
+  document.querySelectorAll(".fab").forEach(f=>f.remove());
+  if(S.tab==="flies") return renderFlies();
+  if(S.tab==="inventory") return renderInventory();
+  if(S.tab==="log") return renderLog();
+  if(S.tab==="species") return renderSpecies();
+}
+function fab(label, fn){ const b=document.createElement("button"); b.className="btn brass fab"; b.textContent=label; b.onclick=fn; document.body.appendChild(b); }
+
+/* ================= FLIES ================= */
+async function renderFlies(){
+  if(!S.flies){ view.innerHTML=`<div class="empty"><span class="spinner"></span></div>`; await loadFlies(); }
+  const F = S.flyFilter;
+  const spOpts = S.species.map(s=>`<option value="${s.id}" ${String(F.species)===String(s.id)?"selected":""}>${esc(s.common_name)}</option>`).join("");
+  let list = S.flies.filter(f => {
+    if(F.species && !(f.fly_species||[]).some(x=>String(x.species_id)===String(F.species))) return false;
+    if(F.water && !(f.water_type===F.water || f.water_type==="both")) return false;
+    if(F.q && !(`${f.name} ${f.fly_type} ${f.description}`.toLowerCase().includes(F.q.toLowerCase()))) return false;
+    if(F.canTie && !canTie(f)) return false;
+    if(F.mine && f.author_id !== S.user?.id) return false;
+    return true;
+  });
+  view.innerHTML = `
+    <input type="search" id="fq" placeholder="Search flies…" value="${esc(F.q)}">
+    <div style="height:8px"></div>
+    <select id="fsp"><option value="">All species</option>${spOpts}</select>
+    <div class="chips" style="margin-top:8px">
+      <span class="chip ${!F.water?"on":""}" data-w="">All water</span>
+      <span class="chip ${F.water==="salt"?"on":""}" data-w="salt">Saltwater</span>
+      <span class="chip ${F.water==="fresh"?"on":""}" data-w="fresh">Freshwater</span>
+      ${S.user?`<span class="chip ${F.canTie?"on":""}" id="fcan">Can tie now</span><span class="chip ${F.mine?"on":""}" id="fmine">My recipes</span>`:""}
+    </div>
+    <p class="small muted">${list.length} ${list.length===1?"fly":"flies"}</p>
+    <div id="flist">${list.map(flyCard).join("") || `<div class="empty">No flies match. Try clearing a filter.</div>`}</div>`;
+  $("#fq").oninput = e => { F.q=e.target.value; clearTimeout(renderFlies.t); renderFlies.t=setTimeout(()=>{ renderFlies().then(()=>{ const i=$("#fq"); i.focus(); i.setSelectionRange(i.value.length,i.value.length); }); }, 250); };
+  $("#fsp").onchange = e => { F.species=e.target.value; renderFlies(); };
+  view.querySelectorAll("[data-w]").forEach(c=>c.onclick=()=>{ F.water=c.dataset.w; renderFlies(); });
+  if($("#fcan")) $("#fcan").onclick=()=>{ F.canTie=!F.canTie; renderFlies(); };
+  if($("#fmine")) $("#fmine").onclick=()=>{ F.mine=!F.mine; renderFlies(); };
+  view.querySelectorAll("[data-fly]").forEach(el=>el.onclick=()=>openFly(Number(el.dataset.fly)));
+  fab("+ Add recipe", ()=>{ if(requireUser()) editFly(); });
+}
+function flyCard(f){
+  const sp = (f.fly_species||[]).map(x=>speciesById(x.species_id)?.common_name).filter(Boolean);
+  const img = flyPhotoUrl(f.cover_photo_path);
+  const tie = S.user && S.inventory.length ? (canTie(f) ? `<span class="small have">● Can tie</span>` : "") : "";
+  return `<div class="card flycard" data-fly="${f.id}">
+    <div class="thumb" style="${img?`background-image:url('${img}')`:""}">${img?"":FLY_ICON}</div>
+    <div class="grow">
+      <h3>${esc(f.name)}</h3>
+      <div class="small muted">${esc(f.fly_type||"")}${f.hook_sizes?` · ${esc(f.hook_sizes.split(";")[0])}`:""} ${tie}</div>
+      <div>${f.water_type?`<span class="tag ${f.water_type}">${f.water_type==="both"?"salt + fresh":f.water_type}</span>`:""}${sp.slice(0,3).map(n=>`<span class="tag">${esc(n.replace(/ \(.+\)/,""))}</span>`).join("")}${sp.length>3?`<span class="tag">+${sp.length-3}</span>`:""}</div>
+    </div></div>`;
+}
+function openFly(id){
+  const f = S.flies.find(x=>x.id===id); if(!f) return;
+  const sp = (f.fly_species||[]).map(x=>speciesById(x.species_id)).filter(Boolean);
+  const mats = [...(f.fly_materials||[])].sort((a,b)=>a.sort-b.sort);
+  const steps = [...(f.fly_steps||[])].sort((a,b)=>a.step_no-b.step_no);
+  const img = flyPhotoUrl(f.cover_photo_path);
+  const mine = S.user && f.author_id===S.user.id;
+  const needList = mats.filter(m=>matStatus(m)==="need");
+  const s = sheet(`
+    ${img?`<img class="hero" src="${img}" alt="">`:""}
+    <div class="row"><h2 class="grow">${esc(f.name)}</h2>${mine?`<button class="btn sm alt" id="editF">Edit</button>`:""}</div>
+    <div class="small muted" style="margin:4px 0 8px">${esc(f.fly_type||"")} · ${esc(f.difficulty||"")} · Hooks ${esc(f.hook_sizes||"—")}<br>${f.is_starter?"Starter pattern":`Shared by ${esc(f.author?.display_name||"a member")}`}</div>
+    <div>${sp.map(x=>`<span class="tag">${esc(x.common_name)}</span>`).join("")}</div>
+    ${f.description?`<p>${esc(f.description)}</p>`:""}
+    ${f.fishing_tips?`<div class="card"><h3>How to fish it</h3><p class="small" style="margin:6px 0 0">${esc(f.fishing_tips)}</p></div>`:""}
+    <div class="card"><div class="row"><h3 class="grow">Materials</h3>${S.user?`<span class="small muted">vs. your bench</span>`:""}</div>
+      <ul style="list-style:none;padding:0;margin:8px 0 0">${mats.map(m=>{ const st=matStatus(m); return `<li style="padding:5px 0;border-bottom:1px solid var(--line)">${st?`<span class="dot ${st}"></span>`:""}<b>${esc(m.part||"")}</b>${m.part?": ":""}${esc(m.material_text)}</li>`; }).join("")}</ul>
+      ${S.user && S.inventory.length?`<p class="small muted" style="margin:8px 0 0"><span class="dot have"></span>have <span class="dot maybe" style="margin-left:8px"></span>have something similar <span class="dot need" style="margin-left:8px"></span>need</p>`:""}
+      ${needList.length?`<button class="btn sm alt" style="margin-top:10px" id="copyNeed">Copy shopping list (${needList.length})</button>`:""}
+    </div>
+    <div class="card"><h3 style="margin-bottom:10px">Steps</h3>
+      <ol class="steps">${steps.map(st=>`<li>${esc(st.instruction)}${st.photo_path?`<img loading="lazy" src="${flyPhotoUrl(st.photo_path)}" alt="Step ${st.step_no}">`:""}</li>`).join("") || `<li class="muted">No steps yet.</li>`}</ol>
+    </div>
+    ${(f.tutorial_links||[]).length?`<div class="card"><h3>Watch it tied</h3>${f.tutorial_links.map(l=>`<p style="margin:8px 0 0"><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label||l.url)} ↗</a></p>`).join("")}</div>`:""}
+    <button class="btn alt" style="width:100%" id="closeF">Close</button>`);
+  $("#closeF",s).onclick=()=>s.remove();
+  if($("#editF",s)) $("#editF",s).onclick=()=>{ s.remove(); editFly(f); };
+  if($("#copyNeed",s)) $("#copyNeed",s).onclick=async()=>{ const txt=`${f.name} – need:\n`+needList.map(m=>`• ${m.material_text}`).join("\n"); try{ await navigator.clipboard.writeText(txt); toast("Shopping list copied"); }catch{ sheet(`<h3>Shopping list</h3><textarea style="min-height:180px">${esc(txt)}</textarea>`); } };
+}
+
+function editFly(f=null){
+  const isNew = !f;
+  f = f || { name:"", fly_type:"", water_type:"salt", hook_sizes:"", difficulty:"beginner", description:"", fishing_tips:"", tutorial_links:[], is_public:true, fly_species:[], fly_materials:[], fly_steps:[], cover_photo_path:null };
+  const mats = [...(f.fly_materials||[])].sort((a,b)=>a.sort-b.sort).map(m=>({...m}));
+  const steps = [...(f.fly_steps||[])].sort((a,b)=>a.step_no-b.step_no).map(st=>({...st}));
+  const spSel = new Set((f.fly_species||[]).map(x=>x.species_id));
+  let cover = f.cover_photo_path, coverFile=null;
+  const links = (f.tutorial_links||[]).map(l=>l.url).join("\n");
+  const s = sheet(`<h2>${isNew?"New recipe":"Edit recipe"}</h2>
+    <label>Fly name</label><input type="text" id="eName" value="${esc(f.name)}">
+    <div class="row"><div class="grow"><label>Type</label><input type="text" id="eType" placeholder="Baitfish, shrimp, crab, popper…" value="${esc(f.fly_type||"")}"></div>
+      <div class="grow"><label>Water</label><select id="eWater">${["salt","fresh","both"].map(w=>`<option ${f.water_type===w?"selected":""} value="${w}">${w==="both"?"Salt + fresh":w[0].toUpperCase()+w.slice(1)}</option>`).join("")}</select></div></div>
+    <div class="row"><div class="grow"><label>Hook sizes</label><input type="text" id="eHooks" value="${esc(f.hook_sizes||"")}"></div>
+      <div class="grow"><label>Difficulty</label><select id="eDiff">${["beginner","intermediate","advanced"].map(d=>`<option ${f.difficulty===d?"selected":""}>${d}</option>`).join("")}</select></div></div>
+    <label>Cover photo</label><div class="photo-pick"><img id="covPrev" src="${cover?flyPhotoUrl(cover):""}" class="${cover?"":"hide"}"><input type="file" accept="image/*" id="eCover"></div>
+    <label>Target species</label><div class="chips wrap" id="eSp" style="flex-wrap:wrap">${S.species.map(sp=>`<span class="chip ${spSel.has(sp.id)?"on":""}" data-sp="${sp.id}">${esc(sp.common_name.replace(/ \(.+\)/,""))}</span>`).join("")}</div>
+    <label>Description</label><textarea id="eDesc">${esc(f.description||"")}</textarea>
+    <label>How to fish it</label><textarea id="eTips">${esc(f.fishing_tips||"")}</textarea>
+    <div class="row" style="margin-top:14px"><h3 class="grow">Materials</h3><button class="btn sm alt" id="addMat">+ Material</button></div>
+    <div id="eMats"></div>
+    <div class="row" style="margin-top:14px"><h3 class="grow">Steps</h3><button class="btn sm alt" id="addStep">+ Step</button></div>
+    <div id="eSteps"></div>
+    <label>Video or tutorial links (one per line)</label><textarea id="eLinks" placeholder="https://…">${esc(links)}</textarea>
+    <label class="row" style="gap:8px;color:var(--ink);font-size:.9rem"><input type="checkbox" id="ePub" ${f.is_public?"checked":""} style="width:auto"> Share with everyone</label>
+    <p class="small muted">Only upload photos you took yourself. Credit any pattern originator in the description.</p>
+    <div class="row" style="margin-top:12px"><button class="btn grow" id="eSave">Save recipe</button>${!isNew?`<button class="btn danger" id="eDel">Delete</button>`:""}</div>`);
+  const drawMats = () => { $("#eMats",s).innerHTML = mats.map((m,i)=>`<div class="edit-row" data-i="${i}">
+      <div class="row"><input type="text" placeholder="Part (tail, body…)" data-k="part" value="${esc(m.part||"")}" style="flex:1"><select data-k="category" style="flex:1">${CATEGORIES.map(c=>`<option value="${c}" ${m.category===c?"selected":""}>${CAT_LABEL[c]}</option>`).join("")}</select></div>
+      <div class="row" style="margin-top:6px"><input type="text" placeholder="Material (e.g. Bucktail, chartreuse)" data-k="material_text" value="${esc(m.material_text||"")}"><button class="btn ghost" data-del>✕</button></div></div>`).join("") || `<p class="small muted">No materials yet.</p>`;
+    $("#eMats",s).querySelectorAll(".edit-row").forEach(r=>{ const i=+r.dataset.i; r.querySelectorAll("[data-k]").forEach(inp=>inp.oninput=inp.onchange=()=>mats[i][inp.dataset.k]=inp.value); r.querySelector("[data-del]").onclick=()=>{ mats.splice(i,1); drawMats(); }; }); };
+  const drawSteps = () => { $("#eSteps",s).innerHTML = steps.map((st,i)=>`<div class="edit-row" data-i="${i}">
+      <div class="row"><b>${i+1}.</b><span class="grow"></span><button class="btn ghost" data-up ${i===0?"disabled":""}>↑</button><button class="btn ghost" data-del>✕</button></div>
+      <textarea data-k="instruction" placeholder="What to do in this step">${esc(st.instruction||"")}</textarea>
+      <div class="photo-pick" style="margin-top:6px"><img class="${st.photo_path||st._preview?"":"hide"}" src="${st._preview || (st.photo_path?flyPhotoUrl(st.photo_path):"")}"><input type="file" accept="image/*" data-photo></div></div>`).join("") || `<p class="small muted">No steps yet.</p>`;
+    $("#eSteps",s).querySelectorAll(".edit-row").forEach(r=>{ const i=+r.dataset.i;
+      r.querySelector("[data-k]").oninput=e=>steps[i].instruction=e.target.value;
+      r.querySelector("[data-del]").onclick=()=>{ steps.splice(i,1); drawSteps(); };
+      r.querySelector("[data-up]").onclick=()=>{ [steps[i-1],steps[i]]=[steps[i],steps[i-1]]; drawSteps(); };
+      r.querySelector("[data-photo]").onchange=e=>{ const file=e.target.files[0]; if(!file) return; steps[i]._file=file; steps[i]._preview=URL.createObjectURL(file); drawSteps(); }; }); };
+  drawMats(); drawSteps();
+  $("#addMat",s).onclick=()=>{ mats.push({part:"",material_text:"",category:"other"}); drawMats(); };
+  $("#addStep",s).onclick=()=>{ steps.push({instruction:""}); drawSteps(); };
+  $("#eSp",s).querySelectorAll("[data-sp]").forEach(c=>c.onclick=()=>{ const id=+c.dataset.sp; spSel.has(id)?spSel.delete(id):spSel.add(id); c.classList.toggle("on"); });
+  $("#eCover",s).onchange=e=>{ coverFile=e.target.files[0]; if(coverFile){ const p=$("#covPrev",s); p.src=URL.createObjectURL(coverFile); p.classList.remove("hide"); } };
+  if($("#eDel",s)) $("#eDel",s).onclick=async()=>{ if(!confirm("Delete this recipe?")) return; const { error } = await sb.from("flies").delete().eq("id", f.id); if(error) return toast(error.message); s.remove(); S.flies=null; toast("Deleted"); renderFlies(); };
+  $("#eSave",s).onclick=async()=>{
+    const name=$("#eName",s).value.trim(); if(!name) return toast("Give the fly a name");
+    const btn=$("#eSave",s); btn.disabled=true; btn.innerHTML=`<span class="spinner"></span> Saving…`;
+    try{
+      if(coverFile) cover = await uploadPhoto("fly-photos", coverFile);
+      for(const st of steps){ if(st._file){ st.photo_path = await uploadPhoto("fly-photos", st._file); } }
+      const row = { name, fly_type:$("#eType",s).value.trim(), water_type:$("#eWater",s).value, hook_sizes:$("#eHooks",s).value.trim(),
+        difficulty:$("#eDiff",s).value, description:$("#eDesc",s).value.trim(), fishing_tips:$("#eTips",s).value.trim(),
+        tutorial_links: $("#eLinks",s).value.split(/\s+/).filter(u=>/^https?:\/\//.test(u)).map(url=>({label:url.replace(/^https?:\/\/(www\.)?/,"").split("/")[0], url})),
+        is_public:$("#ePub",s).checked, cover_photo_path:cover };
+      let id = f.id;
+      if(isNew){ const { data, error } = await sb.from("flies").insert(row).select("id").single(); if(error) throw error; id=data.id; }
+      else { const { error } = await sb.from("flies").update(row).eq("id", id); if(error) throw error;
+        await Promise.all([sb.from("fly_materials").delete().eq("fly_id",id), sb.from("fly_steps").delete().eq("fly_id",id), sb.from("fly_species").delete().eq("fly_id",id)]); }
+      const m = mats.filter(x=>x.material_text?.trim()).map((x,i)=>({ fly_id:id, part:x.part||null, material_text:x.material_text.trim(), category:x.category||"other", material_id:x.material_id||null, sort:i+1 }));
+      const st = steps.filter(x=>x.instruction?.trim()).map((x,i)=>({ fly_id:id, step_no:i+1, instruction:x.instruction.trim(), photo_path:x.photo_path||null }));
+      const sp = [...spSel].map(species_id=>({ fly_id:id, species_id }));
+      for(const [t, rows] of [["fly_materials",m],["fly_steps",st],["fly_species",sp]]) if(rows.length){ const { error } = await sb.from(t).insert(rows); if(error) throw error; }
+      s.remove(); S.flies=null; toast("Recipe saved"); await renderFlies(); openFly(id);
+    }catch(err){ console.error(err); toast(err.message || "Save failed", 4000); btn.disabled=false; btn.textContent="Save recipe"; }
+  };
+}
+
+/* ================= INVENTORY ================= */
+let invQ = "", invLowOnly = false;
+async function renderInventory(){
+  if(!S.user){ view.innerHTML = `<div class="card"><h2>Your tying bench</h2><p class="muted">Sign in to track your materials, scan barcodes when you buy, and see which flies you can tie right now.</p><button class="btn" id="si">Sign in</button></div>`; $("#si").onclick=openAuth; return; }
+  await loadInventory();
+  const low = S.inventory.filter(i => Number(i.quantity) <= Number(i.low_stock_at ?? 0));
+  let items = S.inventory.filter(i => !invQ || `${i.material.name} ${i.material.brand||""} ${i.material.color||""}`.toLowerCase().includes(invQ.toLowerCase()));
+  if(invLowOnly) items = items.filter(i => low.includes(i));
+  const groups = {}; items.forEach(i => (groups[i.material.category] ||= []).push(i));
+  view.innerHTML = `
+    <div class="row" style="margin-bottom:10px">
+      <button class="btn brass grow" id="scanBtn">📷 Scan barcode</button>
+      <button class="btn alt" id="rcptBtn">🧾 Receipt</button>
+    </div>
+    <input type="search" id="iq" placeholder="Search your materials…" value="${esc(invQ)}">
+    <div class="chips" style="margin-top:8px"><span class="chip ${!invLowOnly?"on":""}" id="allI">All (${S.inventory.length})</span><span class="chip ${invLowOnly?"on":""}" id="lowI">Low / out (${low.length})</span>${low.length?`<span class="chip" id="copyLow">Copy shopping list</span>`:""}</div>
+    ${Object.keys(groups).length ? CATEGORIES.filter(c=>groups[c]).map(c=>`<h3 style="margin:14px 0 8px">${CAT_LABEL[c]}</h3>${groups[c].map(invRow).join("")}`).join("") :
+      `<div class="empty">${S.inventory.length?"Nothing matches.":"No materials yet. Scan a barcode or tap + Add material."}</div>`}`;
+  $("#iq").oninput=e=>{ invQ=e.target.value; clearTimeout(renderInventory.t); renderInventory.t=setTimeout(()=>renderInventory().then(()=>{const i=$("#iq"); i.focus(); i.setSelectionRange(i.value.length,i.value.length);}),300); };
+  $("#allI").onclick=()=>{ invLowOnly=false; renderInventory(); };
+  $("#lowI").onclick=()=>{ invLowOnly=true; renderInventory(); };
+  if($("#copyLow")) $("#copyLow").onclick=async()=>{ const txt="Fly tying shopping list:\n"+low.map(i=>`• ${matLabel(i.material)}`).join("\n"); try{ await navigator.clipboard.writeText(txt); toast("Copied"); }catch{ sheet(`<textarea style="min-height:200px">${esc(txt)}</textarea>`); } };
+  $("#scanBtn").onclick=()=>openScanner();
+  $("#rcptBtn").onclick=()=>openReceipt();
+  view.querySelectorAll("[data-inc]").forEach(b=>b.onclick=async e=>{ e.stopPropagation(); await adjust(+b.dataset.mat, +b.dataset.inc, "manual"); renderInventory(); });
+  view.querySelectorAll("[data-inv]").forEach(r=>r.onclick=()=>editInvItem(S.inventory.find(i=>i.id===+r.dataset.inv)));
+  fab("+ Add material", ()=>pickMaterial({ title:"Add material", onPick: async m => { await adjust(m.id, 1, "manual"); toast(`Added ${m.name}`); renderInventory(); } }));
+}
+const matLabel = m => [m.brand, m.name, m.color, m.size].filter(Boolean).join(" · ");
+function invRow(i){
+  const isLow = Number(i.quantity) <= Number(i.low_stock_at ?? 0);
+  return `<div class="card row ${isLow?"low":""}" data-inv="${i.id}" style="padding:10px 12px">
+    <div class="grow"><b>${esc(i.material.name)}</b><div class="small muted">${esc([i.material.brand,i.material.color,i.material.size].filter(Boolean).join(" · "))}${i.storage_location?` · 📍${esc(i.storage_location)}`:""}</div>${isLow?`<div class="small need">${Number(i.quantity)===0?"Out":"Low"}</div>`:""}</div>
+    <div class="qty"><button data-inc="-1" data-mat="${i.material_id}">−</button><b>${Number(i.quantity)}</b><button data-inc="1" data-mat="${i.material_id}">+</button></div></div>`;
+}
+async function adjust(materialId, delta, source){
+  const { data, error } = await sb.rpc("adjust_inventory", { p_material_id: materialId, p_delta: delta, p_source: source });
+  if(error){ toast(error.message); throw error; }
+  return data;
+}
+function editInvItem(i){
+  const m=i.material, mine = m.created_by===S.user.id;
+  const s=sheet(`<h2>${esc(m.name)}</h2><p class="small muted">${esc(matLabel(m))}</p>
+    <div class="row"><div class="grow"><label>Quantity</label><input type="number" min="0" step="0.5" id="q" value="${Number(i.quantity)}"></div>
+    <div class="grow"><label>Warn when at or below</label><input type="number" min="0" step="0.5" id="lw" value="${Number(i.low_stock_at??1)}"></div></div>
+    <label>Where it's stored</label><input type="text" id="loc" value="${esc(i.storage_location||"")}" placeholder="Drawer 2, saltwater box…">
+    <label>Notes</label><textarea id="nt">${esc(i.notes||"")}</textarea>
+    ${mine?`<details style="margin-top:10px"><summary class="small">Edit material details (shared with everyone)</summary>
+      <label>Name</label><input type="text" id="mn" value="${esc(m.name)}"><div class="row"><div class="grow"><label>Brand</label><input type="text" id="mb" value="${esc(m.brand||"")}"></div><div class="grow"><label>Color</label><input type="text" id="mc" value="${esc(m.color||"")}"></div></div>
+      <div class="row"><div class="grow"><label>Size</label><input type="text" id="ms" value="${esc(m.size||"")}"></div><div class="grow"><label>Category</label><select id="mcat">${CATEGORIES.map(c=>`<option value="${c}" ${m.category===c?"selected":""}>${CAT_LABEL[c]}</option>`).join("")}</select></div></div></details>`:""}
+    <div class="row" style="margin-top:14px"><button class="btn grow" id="sv">Save</button><button class="btn danger" id="rm">Remove</button></div>`);
+  $("#sv",s).onclick=async()=>{
+    const newQ = Number($("#q",s).value)||0;
+    await sb.from("inventory").update({ quantity:newQ, low_stock_at:Number($("#lw",s).value)||0, storage_location:$("#loc",s).value.trim()||null, notes:$("#nt",s).value.trim()||null }).eq("id",i.id);
+    if(newQ!==Number(i.quantity)) await sb.from("inventory_events").insert({ material_id:i.material_id, delta:newQ-Number(i.quantity), source:"manual" });
+    if(mine) await sb.from("materials").update({ name:$("#mn",s).value.trim()||m.name, brand:$("#mb",s).value.trim()||null, color:$("#mc",s).value.trim()||null, size:$("#ms",s).value.trim()||null, category:$("#mcat",s).value }).eq("id",m.id);
+    s.remove(); renderInventory(); };
+  $("#rm",s).onclick=async()=>{ if(!confirm("Remove from your inventory?")) return; await sb.from("inventory").delete().eq("id",i.id); s.remove(); renderInventory(); };
+}
+/* material picker: search shared catalog or create */
+function pickMaterial({ title, barcode=null, prefill={}, onPick }){
+  const s=sheet(`<h2>${esc(title)}</h2>${barcode?`<p class="small muted">Barcode ${esc(barcode)} isn't known yet. Name it once and it's saved for everyone.</p>`:""}
+    <input type="search" id="mq" placeholder="Search materials already in the app…" value="${esc(prefill.name||"")}">
+    <div id="mres" style="margin:8px 0"></div>
+    <div class="card"><h3>Or create a new material</h3>
+      <label>Name</label><input type="text" id="nn" value="${esc(prefill.name||"")}" placeholder="Ice Dub, Bucktail, SC15 hook…">
+      <div class="row"><div class="grow"><label>Brand</label><input type="text" id="nb" value="${esc(prefill.brand||"")}" placeholder="Hareline, Wapsi…"></div><div class="grow"><label>Color</label><input type="text" id="nc" value="${esc(prefill.color||"")}"></div></div>
+      <div class="row"><div class="grow"><label>Size</label><input type="text" id="ns" value="${esc(prefill.size||"")}" placeholder="#2, 3/0, medium…"></div><div class="grow"><label>Category</label><select id="ncat">${CATEGORIES.map(c=>`<option value="${c}" ${(prefill.category||"other")===c?"selected":""}>${CAT_LABEL[c]}</option>`).join("")}</select></div></div>
+      <button class="btn" style="margin-top:12px;width:100%" id="ncreate">Create & add</button></div>`);
+  const search = async () => {
+    const q=$("#mq",s).value.trim();
+    if(q.length<2){ $("#mres",s).innerHTML=""; return; }
+    const { data } = await sb.from("materials").select("*").or(`name.ilike.%${q.replace(/[,%()]/g," ")}%,brand.ilike.%${q.replace(/[,%()]/g," ")}%,color.ilike.%${q.replace(/[,%()]/g," ")}%`).limit(15);
+    $("#mres",s).innerHTML = (data||[]).map(m=>`<div class="card row" style="padding:10px;margin-bottom:6px;cursor:pointer" data-m='${m.id}'><div class="grow"><b>${esc(m.name)}</b><div class="small muted">${esc([m.brand,m.color,m.size,CAT_LABEL[m.category]].filter(Boolean).join(" · "))}</div></div><span class="btn sm">Pick</span></div>`).join("") || `<p class="small muted">No matches — create it below.</p>`;
+    $("#mres",s).querySelectorAll("[data-m]").forEach(el=>el.onclick=async()=>{ const m=data.find(x=>x.id===+el.dataset.m); if(barcode) await saveBarcode(barcode, m.id); s.remove(); onPick(m); });
+  };
+  $("#mq",s).oninput=()=>{ clearTimeout(s._t); s._t=setTimeout(search,250); };
+  if(prefill.name) search();
+  $("#ncreate",s).onclick=async()=>{
+    const name=$("#nn",s).value.trim(); if(!name) return toast("Enter a name");
+    const { data:m, error } = await sb.from("materials").insert({ name, brand:$("#nb",s).value.trim()||null, color:$("#nc",s).value.trim()||null, size:$("#ns",s).value.trim()||null, category:$("#ncat",s).value }).select().single();
+    if(error) return toast(error.message);
+    if(barcode) await saveBarcode(barcode, m.id);
+    s.remove(); onPick(m); };
+  return s;
+}
+async function saveBarcode(code, materialId){ const { error } = await sb.from("material_barcodes").insert({ barcode:code, material_id:materialId }); if(error && !/duplicate/.test(error.message)) toast(error.message); }
+
+/* ---- barcode scanner ---- */
+let scanState = null;
+async function openScanner(){
+  const el=document.createElement("div"); el.id="scanner";
+  el.innerHTML=`<video playsinline muted autoplay></video><div class="frame"></div>
+    <div class="bar"><div class="modes"><span class="chip on" data-mode="add">Bought (+1)</span><span class="chip" data-mode="use">Used up (−1)</span><span class="chip" data-mode="haul">Haul mode</span></div>
+    <div id="scanMsg" class="small">Point the camera at the barcode on the package.</div>
+    <div id="haulList" class="small" style="margin-top:6px"></div>
+    <div class="row" style="margin-top:10px"><button class="btn alt grow" id="manualCode">Type code</button><button class="btn brass grow hide" id="haulSave">Save haul</button><button class="btn grow" id="scanDone">Done</button></div></div>`;
+  document.body.appendChild(el);
+  const video=$("video",el);
+  scanState = { mode:"add", busy:false, last:"", lastT:0, haul:new Map(), stop:null };
+  el.querySelectorAll("[data-mode]").forEach(c=>c.onclick=()=>{ scanState.mode=c.dataset.mode; el.querySelectorAll("[data-mode]").forEach(x=>x.classList.toggle("on",x===c)); $("#haulSave",el).classList.toggle("hide", scanState.mode!=="haul"); });
+  const close = () => { scanState?.stop?.(); el.remove(); scanState=null; if(S.tab==="inventory") renderInventory(); };
+  $("#scanDone",el).onclick=close;
+  $("#manualCode",el).onclick=()=>{ const c=prompt("Enter the barcode number"); if(c) handleCode(c.trim()); };
+  $("#haulSave",el).onclick=async()=>{ for(const [mid,v] of scanState.haul) await adjust(mid, v.n, "haul"); toast(`Saved ${scanState.haul.size} item(s)`); scanState.haul.clear(); drawHaul(); };
+  const drawHaul=()=>{ $("#haulList",el).innerHTML=[...scanState.haul.values()].map(v=>`${esc(v.name)} ×${v.n}`).join(" · "); };
+  async function handleCode(code){
+    const now=Date.now(); if(scanState.busy || (code===scanState.last && now-scanState.lastT<2500)) return;
+    scanState.busy=true; scanState.last=code; scanState.lastT=now; navigator.vibrate?.(60);
+    const { data } = await sb.from("material_barcodes").select("material:materials(*)").eq("barcode", code).maybeSingle();
+    const done = async m => {
+      if(scanState.mode==="haul"){ const v=scanState.haul.get(m.id)||{name:m.name,n:0}; v.n++; scanState.haul.set(m.id,v); drawHaul(); $("#scanMsg",el).textContent=`Added to haul: ${m.name}`; }
+      else { const q = await adjust(m.id, scanState.mode==="use"?-1:1, scanState.mode==="use"?"use":"scan"); $("#scanMsg",el).textContent=`${scanState.mode==="use"?"Used":"Added"} ${matLabel(m)} — now ${q}`; }
+      scanState.busy=false;
+    };
+    if(data?.material) await done(data.material);
+    else { const s=pickMaterial({ title:"New barcode", barcode:code, onPick:done }); s.style.zIndex=70; s.addEventListener("click",e=>{ if(e.target===s) scanState.busy=false; }); }
+  }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment", width:{ideal:1280}, height:{ideal:720} } });
+    video.srcObject=stream; await video.play();
+    let running=true;
+    scanState.stop=()=>{ running=false; stream.getTracks().forEach(t=>t.stop()); };
+    if("BarcodeDetector" in window){
+      const det = new BarcodeDetector({ formats:["ean_13","ean_8","upc_a","upc_e","code_128","code_39","qr_code"] });
+      const tick = async()=>{ if(!running) return; try{ const r=await det.detect(video); if(r[0]) handleCode(r[0].rawValue); }catch{} setTimeout(tick, 250); };
+      tick();
+    } else {
+      $("#scanMsg",el).textContent="Loading scanner…";
+      const { BrowserMultiFormatReader } = await import("https://esm.sh/@zxing/browser@0.1.5");
+      const reader = new BrowserMultiFormatReader();
+      $("#scanMsg",el).textContent="Point the camera at the barcode on the package.";
+      const loop = async()=>{ while(running){ try{ const r = await reader.decodeOnceFromVideoElement(video); if(r && running) handleCode(r.getText()); }catch{} await new Promise(r=>setTimeout(r,400)); } };
+      loop();
+    }
+  }catch(err){ console.error(err); $("#scanMsg",el).textContent="Camera unavailable. Allow camera access, or tap “Type code”."; }
+}
+
+/* ---- receipt reader ---- */
+function openReceipt(){
+  const s=sheet(`<h2>Read a receipt</h2><p class="small muted">Snap a receipt, order email or packing slip. Claude pulls out the tying materials for you to review.</p>
+    <input type="file" accept="image/*" id="rf"><div id="rres" style="margin-top:12px"></div>`);
+  $("#rf",s).onchange=async e=>{
+    const file=e.target.files[0]; if(!file) return;
+    $("#rres",s).innerHTML=`<p><span class="spinner"></span> Reading receipt…</p>`;
+    try{
+      const { dataUrl } = await resizeImage(file, 2000, .85);
+      const r = await callFn("receipt-read", { image:dataUrl, media_type:"image/jpeg" });
+      const items = r.items||[];
+      if(!items.length){ $("#rres",s).innerHTML=`<p class="muted">No tying materials found on that image.</p>`; return; }
+      $("#rres",s).innerHTML = items.map((it,i)=>`<div class="edit-row row" data-i="${i}"><input type="checkbox" checked style="width:auto"><div class="grow"><b>${esc(it.name)}</b><div class="small muted">${esc([it.brand,it.color,it.size].filter(Boolean).join(" · "))}</div></div><input type="number" min="0" value="${Number(it.qty)||1}" style="width:64px"></div>`).join("")
+        + `<button class="btn" style="width:100%" id="rAdd">Add checked items</button><p class="small muted">Items not already in the app will be created. You can edit details later.</p>`;
+      $("#rAdd",s).onclick=async()=>{
+        const btn=$("#rAdd",s); btn.disabled=true; btn.innerHTML=`<span class="spinner"></span> Adding…`;
+        let n=0;
+        for(const row of s.querySelectorAll("[data-i]")){
+          if(!row.querySelector("input[type=checkbox]").checked) continue;
+          const it=items[+row.dataset.i], qty=Number(row.querySelector("input[type=number]").value)||1;
+          let q = sb.from("materials").select("*").ilike("name", it.name);
+          q = it.color ? q.ilike("color", it.color) : q.is("color", null);
+          let { data:found } = await q.limit(1);
+          let m = found?.[0];
+          if(!m){ const r2 = await sb.from("materials").insert({ name:it.name, brand:it.brand||null, color:it.color||null, size:it.size||null, category:CATEGORIES.includes(it.category)?it.category:"other" }).select().single(); m=r2.data; }
+          if(m){ await adjust(m.id, qty, "receipt"); n++; }
+        }
+        s.remove(); toast(`Added ${n} item(s)`); renderInventory(); };
+    }catch(err){ $("#rres",s).innerHTML=`<p class="need">${esc(err.message)}</p>`; }
+  };
+}
+
+/* ================= FISH LOG ================= */
+let logView = "list", map = null;
+async function renderLog(){
+  if(!S.user){ view.innerHTML = `<div class="card"><h2>Fish log</h2><p class="muted">Sign in to log catches with GPS, photos, the fly you used and the current regulations. Your catch locations stay private to you.</p><button class="btn" id="si">Sign in</button></div>`; $("#si").onclick=openAuth; return; }
+  if(!S.catches){ view.innerHTML=`<div class="empty"><span class="spinner"></span></div>`; await loadCatches(); }
+  if(!S.flies) await loadFlies();
+  const total=S.catches.length, bySp={}; S.catches.forEach(c=>{ const n=speciesById(c.species_id)?.common_name || c.species_other || "Unknown"; bySp[n]=(bySp[n]||0)+1; });
+  view.innerHTML = `
+    <div class="seg"><button class="${logView==="list"?"on":""}" data-v="list">List</button><button class="${logView==="map"?"on":""}" data-v="map">Map</button><button class="${logView==="stats"?"on":""}" data-v="stats">Stats</button></div>
+    <div id="logBody"></div>`;
+  view.querySelectorAll("[data-v]").forEach(b=>b.onclick=()=>{ logView=b.dataset.v; renderLog(); });
+  const body=$("#logBody");
+  if(logView==="list"){
+    body.innerHTML = S.catches.map(c=>{ const sp=speciesById(c.species_id); const fly=S.flies.find(f=>f.id===c.fly_id);
+      return `<div class="card flycard" data-c="${c.id}"><div class="thumb" style="${c.photo_url?`background-image:url('${c.photo_url}')`:""}">${c.photo_url?"":FISH_ICON}</div>
+      <div class="grow"><h3>${esc(sp?.common_name || c.species_other || "Unknown species")}</h3><div class="small muted">${fmtDate(c.caught_at)}${c.location_name?` · ${esc(c.location_name)}`:""}</div>
+      <div class="small">${c.length_in?`${c.length_in}" `:""}${fly?`on ${esc(fly.name)}`:""} ${c.kept?`<span class="tag">kept</span>`:`<span class="tag">released</span>`}</div></div></div>`; }).join("") || `<div class="empty">No fish logged yet. Tap “+ Log a fish”.</div>`;
+    body.querySelectorAll("[data-c]").forEach(el=>el.onclick=()=>openCatch(S.catches.find(c=>c.id===+el.dataset.c)));
+  } else if(logView==="map"){
+    body.innerHTML=`<div id="map"></div><p class="small muted">Only you can see your catch locations.</p>`;
+    if(!window.L){ await new Promise(r=>{ const sc=document.createElement("script"); sc.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; sc.onload=r; document.head.appendChild(sc); }); }
+    map = L.map("map").setView([30.33,-81.6], 10);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom:19, attribution:"© OpenStreetMap" }).addTo(map);
+    const pts=[];
+    S.catches.filter(c=>c.lat&&c.lng).forEach(c=>{ const sp=speciesById(c.species_id); pts.push([c.lat,c.lng]);
+      L.circleMarker([c.lat,c.lng],{ radius:8, color:"#123b3a", fillColor:"#b9852f", fillOpacity:.9, weight:2 }).addTo(map)
+       .bindPopup(`<b>${esc(sp?.common_name||c.species_other||"Fish")}</b><br>${fmtDate(c.caught_at)}${c.length_in?`<br>${c.length_in}"`:""}`); });
+    if(pts.length) map.fitBounds(pts, { padding:[30,30], maxZoom:14 });
+  } else {
+    const flyCounts={}; S.catches.forEach(c=>{ if(c.fly_id){ const n=S.flies.find(f=>f.id===c.fly_id)?.name; if(n) flyCounts[n]=(flyCounts[n]||0)+1; } });
+    const bar=(obj)=>{ const e=Object.entries(obj).sort((a,b)=>b[1]-a[1]); const max=Math.max(1,...e.map(x=>x[1])); return e.map(([k,v])=>`<div style="margin:6px 0"><div class="row small"><span class="grow">${esc(k)}</span><b>${v}</b></div><div style="height:8px;background:#e9e3d4;border-radius:4px"><div style="height:8px;width:${v/max*100}%;background:var(--teal2);border-radius:4px"></div></div></div>`).join("") || `<p class="small muted">Nothing yet.</p>`; };
+    body.innerHTML=`<div class="card"><h3>${total} fish logged</h3></div><div class="card"><h3>By species</h3>${bar(bySp)}</div><div class="card"><h3>Best flies</h3>${bar(flyCounts)}</div>`;
+  }
+  fab("+ Log a fish", ()=>editCatch());
+}
+function regsHtml(spId){
+  const sp=speciesById(spId); if(!sp) return "";
+  const rs=S.regs[spId]||[];
+  return `<div class="card reg"><div class="row"><h3 class="grow">FWC rules: ${esc(sp.common_name)}</h3></div>
+    ${rs.map(r=>`<dl style="margin:0"><dt>Region</dt><dd>${esc(r.region)}</dd>${r.size_limit?`<dt>Size</dt><dd>${esc(r.size_limit)}</dd>`:""}${r.bag_limit?`<dt>Bag limit</dt><dd>${esc(r.bag_limit)}</dd>`:""}${r.vessel_limit?`<dt>Vessel limit</dt><dd>${esc(r.vessel_limit)}</dd>`:""}${r.season?`<dt>Season</dt><dd>${esc(r.season)}</dd>`:""}${r.notes?`<dt>Notes</dt><dd class="small">${esc(r.notes)}</dd>`:""}</dl>`).join("")}
+    <p class="small muted" style="margin:10px 0 0">Summary checked ${rs[0]?new Date(rs[0].verified_on+"T12:00").toLocaleDateString():""}. Rules change — verify before you keep a fish.</p>
+    <a class="btn sm" style="display:inline-block;margin-top:8px;text-decoration:none" href="${esc(sp.fwc_url)}" target="_blank" rel="noopener">Official FWC page ↗</a></div>`;
+}
+function editCatch(c=null){
+  const isNew=!c;
+  c = c || { caught_at:new Date().toISOString(), lat:null, lng:null, species_id:null, kept:false };
+  const local = new Date(new Date(c.caught_at).getTime() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16);
+  let photoFile=null, lat=c.lat, lng=c.lng, ai={ guess:c.ai_guess, conf:c.ai_confidence };
+  const s=sheet(`<h2>${isNew?"Log a fish":"Edit catch"}</h2>
+    <label>Photo</label><div class="photo-pick"><img id="cPrev" class="${c.photo_url?"":"hide"}" src="${c.photo_url||""}"><input type="file" accept="image/*" capture="environment" id="cPhoto"></div>
+    <button class="btn brass" style="width:100%;margin-top:10px" id="cId" ${c.photo_url?"":"disabled"}>🔍 Identify species from photo</button>
+    <div id="aiBox"></div>
+    <label>Species</label><select id="cSp"><option value="">— Pick species —</option>${S.species.map(sp=>`<option value="${sp.id}" ${c.species_id===sp.id?"selected":""}>${esc(sp.common_name)}</option>`).join("")}<option value="other" ${!c.species_id&&c.species_other?"selected":""}>Other…</option></select>
+    <input type="text" id="cOther" class="${!c.species_id&&c.species_other?"":"hide"}" style="margin-top:6px" placeholder="Species name" value="${esc(c.species_other||"")}">
+    <div id="spHelp"></div>
+    <div id="regBox"></div>
+    <label>When</label><input type="datetime-local" id="cWhen" value="${local}">
+    <label>Location</label>
+    <div class="row"><button class="btn alt" id="cGps">📍 Use my location</button><span class="small muted grow" id="gpsTxt">${lat?`${lat.toFixed(5)}, ${lng.toFixed(5)}`:"No GPS yet"}</span></div>
+    <input type="text" id="cLoc" style="margin-top:6px" placeholder="Spot name (optional) — e.g. Mill Cove" value="${esc(c.location_name||"")}">
+    <label>Fly used</label><select id="cFly"><option value="">—</option>${(S.flies||[]).map(f=>`<option value="${f.id}" ${c.fly_id===f.id?"selected":""}>${esc(f.name)}</option>`).join("")}</select>
+    <div class="row"><div class="grow"><label>Length (in)</label><input type="number" step="0.25" id="cLen" value="${c.length_in??""}"></div><div class="grow"><label>Weight (lb)</label><input type="number" step="0.1" id="cWt" value="${c.weight_lb??""}"></div></div>
+    <label class="row" style="gap:8px;color:var(--ink);font-size:.9rem"><input type="checkbox" id="cKept" ${c.kept?"checked":""} style="width:auto"> I kept this fish</label>
+    <label>Notes</label><textarea id="cNotes" placeholder="Tide, water temp, retrieve…">${esc(c.notes||"")}</textarea>
+    <div class="row" style="margin-top:12px"><button class="btn grow" id="cSave">Save</button>${!isNew?`<button class="btn danger" id="cDel">Delete</button>`:""}</div>`);
+  const spSel=$("#cSp",s);
+  const showSp=()=>{ const v=spSel.value; $("#cOther",s).classList.toggle("hide", v!=="other"); const sp=speciesById(+v);
+    $("#regBox",s).innerHTML = sp ? regsHtml(sp.id) : ""; $("#spHelp",s).innerHTML = sp?.id_tips?`<p class="small muted" style="margin:6px 0 0">ID tip: ${esc(sp.id_tips)}</p>`:""; checkKeep(); };
+  const checkKeep=()=>{ const sp=speciesById(+spSel.value); const rs=S.regs[sp?.id]||[]; const warn=$("#keepWarn",s); warn?.remove();
+    if($("#cKept",s).checked && rs.some(r=>/catch and release/i.test(r.size_limit||""))) $("#cKept",s).closest("label").insertAdjacentHTML("afterend",`<p id="keepWarn" class="small need">This species is catch-and-release only.</p>`); };
+  spSel.onchange=showSp; $("#cKept",s).onchange=checkKeep; showSp();
+  $("#cPhoto",s).onchange=e=>{ photoFile=e.target.files[0]; if(photoFile){ const p=$("#cPrev",s); p.src=URL.createObjectURL(photoFile); p.classList.remove("hide"); $("#cId",s).disabled=false; } };
+  $("#cId",s).onclick=async()=>{
+    const btn=$("#cId",s); btn.disabled=true; btn.innerHTML=`<span class="spinner"></span> Identifying…`;
+    try{
+      let src = photoFile;
+      if(!src && c.photo_url){ src = await (await fetch(c.photo_url)).blob(); }
+      const { dataUrl } = await resizeImage(src, 1024, .85);
+      const r = await callFn("species-id", { image:dataUrl, media_type:"image/jpeg" });
+      ai = { guess:r.species, conf:r.confidence };
+      const match = S.species.find(sp=>r.species && sp.common_name.toLowerCase()===r.species.toLowerCase());
+      $("#aiBox",s).innerHTML = `<div class="card ai" style="margin-top:10px">
+        ${r.species?`<div class="row"><div class="grow"><b>${esc(r.species)}</b> <span class="small muted">· ${esc(r.confidence)} confidence</span></div>${match||r.species?`<button class="btn sm" id="useAi">Use this</button>`:""}</div>`:`<b>No clear ID</b>`}
+        ${r.reason?`<p class="small" style="margin:6px 0 0">${esc(r.reason)}</p>`:""}
+        ${(r.alternatives||[]).length?`<div class="small muted" style="margin-top:6px">Could also be: ${(r.alternatives).map(a=>`<a href="#" data-alt="${esc(a)}">${esc(a)}</a>`).join(", ")}</div>`:""}
+        <p class="small muted" style="margin:6px 0 0">AI suggestion — please confirm. ${r.remaining_today!=null?`${r.remaining_today} IDs left today.`:""}</p></div>`;
+      const apply = name => { const m=S.species.find(sp=>sp.common_name.toLowerCase()===name.toLowerCase()); if(m){ spSel.value=m.id; } else { spSel.value="other"; $("#cOther",s).value=name; } showSp(); };
+      if($("#useAi",s)) $("#useAi",s).onclick=()=>apply(r.species);
+      s.querySelectorAll("[data-alt]").forEach(a=>a.onclick=e=>{ e.preventDefault(); apply(a.dataset.alt); });
+    }catch(err){ $("#aiBox",s).innerHTML=`<p class="small need">${esc(err.message)}</p>`; }
+    btn.disabled=false; btn.textContent="🔍 Identify species from photo";
+  };
+  $("#cGps",s).onclick=()=>{ $("#gpsTxt",s).innerHTML=`<span class="spinner"></span>`;
+    navigator.geolocation.getCurrentPosition(p=>{ lat=p.coords.latitude; lng=p.coords.longitude; $("#gpsTxt",s).textContent=`${lat.toFixed(5)}, ${lng.toFixed(5)} (±${Math.round(p.coords.accuracy)} m)`; },
+      err=>{ $("#gpsTxt",s).textContent="Couldn't get location — allow location access"; }, { enableHighAccuracy:true, timeout:15000 }); };
+  if(isNew) $("#cGps",s).click();
+  if($("#cDel",s)) $("#cDel",s).onclick=async()=>{ if(!confirm("Delete this catch?")) return; await sb.from("catches").delete().eq("id",c.id); if(c.photo_path) await sb.storage.from("catch-photos").remove([c.photo_path]); s.remove(); S.catches=null; renderLog(); };
+  $("#cSave",s).onclick=async()=>{
+    const btn=$("#cSave",s); btn.disabled=true; btn.innerHTML=`<span class="spinner"></span> Saving…`;
+    try{
+      let photo_path=c.photo_path||null;
+      if(photoFile) photo_path = await uploadPhoto("catch-photos", photoFile);
+      const v=spSel.value, spId = v && v!=="other" ? +v : null;
+      const row={ caught_at:new Date($("#cWhen",s).value).toISOString(), lat, lng, location_name:$("#cLoc",s).value.trim()||null,
+        species_id:spId, species_other: v==="other" ? $("#cOther",s).value.trim()||null : null, species_confirmed: !!(spId || v==="other"),
+        ai_guess:ai.guess||null, ai_confidence:ai.conf||null, length_in:$("#cLen",s).value||null, weight_lb:$("#cWt",s).value||null,
+        fly_id:$("#cFly",s).value?+$("#cFly",s).value:null, kept:$("#cKept",s).checked, photo_path, notes:$("#cNotes",s).value.trim()||null };
+      const r = isNew ? await sb.from("catches").insert(row) : await sb.from("catches").update(row).eq("id",c.id);
+      if(r.error) throw r.error;
+      s.remove(); S.catches=null; toast("Catch saved"); renderLog();
+    }catch(err){ toast(err.message||"Save failed",4000); btn.disabled=false; btn.textContent="Save"; }
+  };
+}
+function openCatch(c){
+  const sp=speciesById(c.species_id), fly=S.flies?.find(f=>f.id===c.fly_id);
+  const name = sp?.common_name || c.species_other || "Unknown species";
+  const s=sheet(`${c.photo_url?`<img class="hero" src="${c.photo_url}">`:""}
+    <h2>${esc(name)}</h2><p class="small muted">${fmtDate(c.caught_at)}${c.location_name?` · ${esc(c.location_name)}`:""}</p>
+    <div class="card"><div class="small">${c.length_in?`<b>${c.length_in}"</b> · `:""}${c.weight_lb?`<b>${c.weight_lb} lb</b> · `:""}${c.kept?"Kept":"Released"}${fly?` · on <a href="#" id="toFly">${esc(fly.name)}</a>`:""}</div>
+      ${c.lat?`<div class="small muted" style="margin-top:4px">📍 ${c.lat.toFixed(5)}, ${c.lng.toFixed(5)} · <a href="https://maps.google.com/?q=${c.lat},${c.lng}" target="_blank" rel="noopener">open map</a></div>`:""}
+      ${c.ai_guess?`<div class="small muted" style="margin-top:4px">AI suggested: ${esc(c.ai_guess)} (${esc(c.ai_confidence||"")})</div>`:""}
+      ${c.notes?`<p class="small" style="margin:8px 0 0">${esc(c.notes)}</p>`:""}</div>
+    ${sp?regsHtml(sp.id):""}
+    <div class="card"><h3>Get a second opinion</h3><p class="small muted" style="margin:6px 0 8px">Post this catch to iNaturalist and their community will help confirm the species. Save the photo first, then upload it there.</p>
+      <div class="row wrap">${c.photo_url?`<a class="btn sm alt" href="${c.photo_url}" target="_blank" rel="noopener" download>Save photo</a>`:""}<a class="btn sm" href="https://www.inaturalist.org/observations/upload" target="_blank" rel="noopener" id="inat">Open iNaturalist ↗</a></div></div>
+    <div class="row"><button class="btn grow" id="ed">Edit</button><button class="btn alt grow" id="cl">Close</button></div>`);
+  $("#ed",s).onclick=()=>{ s.remove(); editCatch(c); };
+  $("#cl",s).onclick=()=>s.remove();
+  $("#inat",s).onclick=()=>{ const t=`${sp?.inat_taxon_name||name}${c.lat?` @ ${c.lat.toFixed(4)}, ${c.lng.toFixed(4)}`:""}`; navigator.clipboard?.writeText(t).then(()=>toast("Species & location copied — paste into iNaturalist")).catch(()=>{}); };
+  if($("#toFly",s)) $("#toFly",s).onclick=e=>{ e.preventDefault(); s.remove(); setTab("flies"); openFly(fly.id); };
+}
+
+/* ================= SPECIES / REGS ================= */
+async function renderSpecies(){
+  if(!S.flies) await loadFlies();
+  const groups={}; S.species.forEach(sp=>(groups[sp.group_name||"Other"] ||= []).push(sp));
+  view.innerHTML = `<div class="card" style="background:#fbf3e2"><p class="small" style="margin:0">Northeast Florida summary of FWC recreational rules, checked when the app was built. Rules change often — always confirm on the official FWC page before keeping a fish.</p></div>
+    ${Object.entries(groups).map(([g,list])=>`<h3 style="margin:16px 0 8px">${esc(g)}</h3>${list.map(sp=>{ const r=(S.regs[sp.id]||[])[0]; const n=S.flies.filter(f=>(f.fly_species||[]).some(x=>x.species_id===sp.id)).length;
+      return `<div class="card" data-sp="${sp.id}" style="cursor:pointer"><div class="row"><div class="grow"><h3>${esc(sp.common_name)}</h3><div class="small muted"><i>${esc(sp.scientific_name||"")}</i></div></div><span class="small muted">${n} flies ›</span></div>
+      ${r?`<div class="small" style="margin-top:6px">${[r.size_limit,r.bag_limit,r.season].filter(Boolean).map(esc).join(" · ") || "No specific limits on file"}</div>`:""}</div>`; }).join("")}`).join("")}`;
+  view.querySelectorAll("[data-sp]").forEach(el=>el.onclick=()=>{ const sp=speciesById(+el.dataset.sp);
+    const s=sheet(`<h2>${esc(sp.common_name)}</h2><p class="small muted"><i>${esc(sp.scientific_name||"")}</i></p>${sp.id_tips?`<p class="small"><b>How to ID:</b> ${esc(sp.id_tips)}</p>`:""}${regsHtml(sp.id)}
+      <button class="btn" style="width:100%" id="sf">See flies for ${esc(sp.common_name.replace(/ \(.+\)/,""))}</button>`);
+    $("#sf",s).onclick=()=>{ s.remove(); S.flyFilter={...S.flyFilter, species:String(sp.id)}; setTab("flies"); }; });
+}
+
+/* ---------------- boot ---------------- */
+sb.auth.onAuthStateChange((evt)=>{ if(evt==="SIGNED_IN"||evt==="SIGNED_OUT") afterAuth(); if(evt==="PASSWORD_RECOVERY"){ const p=prompt("Enter a new password"); if(p) sb.auth.updateUser({password:p}).then(()=>toast("Password updated")); } });
+(async()=>{
+  view.innerHTML=`<div class="empty"><span class="spinner"></span></div>`;
+  await Promise.all([refreshUser(), loadBase()]);
+  await loadInventory();
+  render();
+})();
+</script>
+</body>
+</html>
