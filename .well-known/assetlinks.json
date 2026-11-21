@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "org.flytyingrecipes.app",
+        "sha256_cert_fingerprints": ["17:72:0B:C0:CF:89:64:71:6D:DE:B5:C6:52:AD:34:C3:DC:B4:FB:53:7D:37:A7:26:83:98:24:00:0D:FD:0D:40"]
+      }
+    }]
