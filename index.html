@@ -120,6 +120,9 @@ ol.steps img{width:100%;border-radius:10px;margin-top:8px}
 .spinner{display:inline-block;width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-3px}
 @keyframes spin{to{transform:rotate(360deg)}}
 .hide{display:none!important}
+.hero-link{position:relative;display:block}.hero-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:3rem;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.6);pointer-events:none}
+.card.credit{border-left:4px solid #b5832f}
+.card.credit a.btn{display:block;color:#fff;text-decoration:none}
 </style>
 </head>
 <body>
@@ -201,6 +204,15 @@ function ytParse(u){
 }
 const ytCanon = u => { const p = ytParse(u); return p ? `https://www.youtube.com/watch?v=${p.id}${p.start?`&t=${p.start}s`:""}` : null; };
 const ytThumb = u => { const p = ytParse(u); return p ? `https://i.ytimg.com/vi/${p.id}/hqdefault.jpg` : null; };
+const ytWatchUrl = u => ytCanon(u) || u;
+const safeHttps = u => /^https:\/\//i.test(u||"") ? u : "";
+function creatorBlock(f){
+  const watch = f.youtube_url ? ytWatchUrl(f.youtube_url) : safeHttps((f.tutorial_links||[])[0]?.url) || safeHttps(f.creator_url);
+  if(!f.creator_name && !(watch && f.creator_url)) return "";
+  const cu = safeHttps(f.creator_url);
+  return `<div class="card credit">${f.creator_name?`<div class="small muted">Pattern credit</div><div style="font-weight:700;margin:2px 0 8px">${cu?`<a href="${esc(cu)}" target="_blank" rel="noopener">${esc(f.creator_name)} ↗</a>`:esc(f.creator_name)}</div>`:""}
+    ${watch?`<a class="btn" style="width:100%;text-align:center" href="${esc(watch)}" target="_blank" rel="noopener">▶ Watch how to tie it${f.creator_name?` with ${esc(f.creator_name)}`:""}</a>`:""}</div>`;
+}
 const ytEmbed = (u, cls="") => { const p = ytParse(u); if(!p) return "";
   return `<div class="yt ${cls}"><iframe src="https://www.youtube-nocookie.com/embed/${p.id}?rel=0&playsinline=1${p.start?`&start=${p.start}`:""}" title="YouTube video" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`; };
 const commonsUrl = (u, w) => u && /^https:\/\/commons\.wikimedia\.org\//.test(u) ? u.replace(/width=\d+/, "width="+w) : null;
@@ -415,6 +427,7 @@ function flyCard(f){
     <div class="thumb" style="${img?`background-image:url('${img}')`:""}">${img?"":FLY_ICON}${f.youtube_url||(f.fly_steps||[]).some(x=>x.youtube_url)?`<span class="media-tag">▶ Video</span>`:""}</div>
     <div class="grow">
       <h3>${esc(f.name)}</h3>
+      ${f.creator_name?`<div class="small" style="color:var(--accent,#1f4d3a)">by ${esc(f.creator_name)}</div>`:""}
       <div class="small muted">${esc(f.fly_type||"")}${f.hook_sizes?` · ${esc(f.hook_sizes.split(";")[0])}`:""} ${tie}</div>
       <div>${f.water_type?`<span class="tag ${f.water_type}">${f.water_type==="both"?"salt + fresh":f.water_type}</span>`:""}${sp.slice(0,3).map(n=>`<span class="tag">${esc(n.replace(/ \(.+\)/,""))}</span>`).join("")}${sp.length>3?`<span class="tag">+${sp.length-3}</span>`:""}</div>
     </div></div>`;
@@ -428,11 +441,12 @@ function openFly(id){
   const mine = S.user && f.author_id===S.user.id;
   const needList = mats.filter(m=>matStatus(m)==="need");
   const s = sheet(`
-    ${f.youtube_url?ytEmbed(f.youtube_url,"hero"):img?`<img class="hero${f.cover_photo_path?"":" fit"}" src="${img}" alt="${esc(f.name)}">`:""}
+    ${f.youtube_url && f.creator_name ? `<a href="${esc(ytWatchUrl(f.youtube_url))}" target="_blank" rel="noopener" class="hero-link"><img class="hero" src="${esc(img||ytThumb(f.youtube_url))}" alt="${esc(f.name)}"><span class="hero-play">▶</span></a>` : f.youtube_url?ytEmbed(f.youtube_url,"hero"):img?`<img class="hero${f.cover_photo_path?"":" fit"}" src="${img}" alt="${esc(f.name)}">`:""}
     ${!f.cover_photo_path && !f.youtube_url ? photoCredit(f) : ""}
     <div class="row"><h2 class="grow">${esc(f.name)}</h2>${mine?`<button class="btn sm alt" id="editF">Edit</button>`:""}</div>
     <div class="small muted" style="margin:4px 0 8px">${esc(f.fly_type||"")} · ${esc(f.difficulty||"")} · Hooks ${esc(f.hook_sizes||"—")}<br>${f.is_starter?"Starter pattern":`Shared by ${esc(f.author?.display_name||"a member")}`}</div>
     <div>${sp.map(x=>`<span class="tag">${esc(x.common_name)}</span>`).join("")}</div>
+    ${creatorBlock(f)}
     ${f.description?`<p>${esc(f.description)}</p>`:""}
     ${f.fishing_tips?`<div class="card"><h3>How to fish it</h3><p class="small" style="margin:6px 0 0">${esc(f.fishing_tips)}</p></div>`:""}
     <div class="card"><div class="row"><h3 class="grow">Materials</h3>${S.user?`<span class="small muted">vs. your bench</span>`:""}</div>
@@ -441,7 +455,7 @@ function openFly(id){
       ${needList.length?`<button class="btn sm alt" style="margin-top:10px" id="copyNeed">Copy shopping list (${needList.length})</button>`:""}
     </div>
     <div class="card"><h3 style="margin-bottom:10px">Steps</h3>
-      <ol class="steps">${steps.map(st=>`<li>${esc(st.instruction)}${st.photo_path?`<img loading="lazy" src="${flyPhotoUrl(st.photo_path)}" alt="Step ${st.step_no}">`:""}${st.youtube_url?ytEmbed(st.youtube_url):""}</li>`).join("") || `<li class="muted">No steps yet.</li>`}</ol>
+      <ol class="steps">${steps.map(st=>`<li>${esc(st.instruction)}${st.photo_path?`<img loading="lazy" src="${flyPhotoUrl(st.photo_path)}" alt="Step ${st.step_no}">`:""}${st.youtube_url?(f.creator_name?`<a class="small" style="display:block;margin-top:6px" href="${esc(ytWatchUrl(st.youtube_url))}" target="_blank" rel="noopener">▶ Watch this step on YouTube</a>`:ytEmbed(st.youtube_url)):""}</li>`).join("") || `<li class="muted">No steps yet.</li>`}</ol>
     </div>
     ${(f.tutorial_links||[]).length?`<div class="card"><h3>Watch it tied</h3>${f.tutorial_links.map(l=>`<p style="margin:8px 0 0"><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label||l.url)} ↗</a></p>`).join("")}</div>`:""}
     ${!f.is_starter && !mine ? `<div class="row" style="margin-bottom:10px"><button class="btn sm ghost" id="repF">⚑ Report this recipe</button><span class="grow"></span>${f.author_id?`<button class="btn sm ghost" id="hideF">Hide this member's recipes</button>`:""}</div>`:""}
@@ -482,6 +496,8 @@ function editFly(f=null){
     <label>YouTube video of the whole fly being tied (optional)</label><input type="url" id="eYt" inputmode="url" placeholder="https://youtu.be/…" value="${esc(f.youtube_url||"")}">
     <div class="yt-prev" id="eYtPrev"></div>
     <p class="small muted" style="margin:4px 0 0">Paste the link from YouTube's Share button. No photo? We'll use the video's thumbnail.</p>
+    <div class="row"><div class="grow"><label>Pattern credit (designer or tyer)</label><input type="text" id="eCred" maxlength="120" placeholder="e.g. Tim Cammisa" value="${esc(f.creator_name||"")}"></div>
+      <div class="grow"><label>Their channel or website</label><input type="url" id="eCredUrl" inputmode="url" placeholder="https://…" value="${esc(f.creator_url||"")}"></div></div>
     <label>Target species</label><div class="chips wrap" id="eSp" style="flex-wrap:wrap">${S.species.map(sp=>`<span class="chip ${spSel.has(sp.id)?"on":""}" data-sp="${sp.id}">${esc(sp.common_name.replace(/ \(.+\)/,""))}</span>`).join("")}</div>
     <label>Description</label><textarea id="eDesc">${esc(f.description||"")}</textarea>
     <label>How to fish it</label><textarea id="eTips">${esc(f.fishing_tips||"")}</textarea>
@@ -525,6 +541,8 @@ function editFly(f=null){
     if(!mats.some(x=>x.material_text?.trim())) return toast("Add at least one material to the materials list", 3500);
     if(!steps.some(x=>x.instruction?.trim())) return toast("Type at least one step-by-step instruction", 3500);
     const yt=$("#eYt",s).value.trim();
+    const credUrl=$("#eCredUrl",s).value.trim();
+    if(credUrl && !/^https:\/\//i.test(credUrl)) return toast("The credit link must start with https://", 3500);
     if(yt && !ytParse(yt)) return toast("The full-video link isn't a YouTube link. Copy it from YouTube's Share button.", 4500);
     const badStep = steps.findIndex(x=>x.youtube_url && !ytParse(x.youtube_url));
     if(badStep>=0) return toast(`Step ${badStep+1}'s video link isn't a YouTube link`, 4000);
@@ -543,7 +561,8 @@ function editFly(f=null){
       const row = { name, fly_type:$("#eType",s).value.trim(), water_type:$("#eWater",s).value, hook_sizes:$("#eHooks",s).value.trim(),
         difficulty:$("#eDiff",s).value, description:$("#eDesc",s).value.trim(), fishing_tips:$("#eTips",s).value.trim(),
         tutorial_links: $("#eLinks",s).value.split(/\s+/).filter(u=>/^https?:\/\//.test(u)).map(url=>({label:url.replace(/^https?:\/\/(www\.)?/,"").split("/")[0], url})),
-        is_public:$("#ePub",s).checked, cover_photo_path:cover, youtube_url:yt?ytCanon(yt):null };
+        is_public:$("#ePub",s).checked, cover_photo_path:cover, youtube_url:yt?ytCanon(yt):null,
+        creator_name:$("#eCred",s).value.trim()||null, creator_url:credUrl||null };
       let id = f.id;
       if(isNew){ const { data, error } = await sb.from("flies").insert(row).select("id").single(); if(error) throw error; id=data.id; }
       else { const { error } = await sb.from("flies").update(row).eq("id", id); if(error) throw error;
