@@ -70,6 +70,9 @@ ol.steps img{width:100%;border-radius:10px;margin-top:8px}
 .qty button{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:#fff;font-size:1.1rem;font-weight:600}
 .qty b{min-width:30px;text-align:center}
 .low{background:#fbeee2;border-color:#f0d3b8}
+.buy{display:inline-block;margin-top:4px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:#fff;font-size:.8rem;font-weight:600;color:inherit;text-decoration:none;white-space:nowrap}
+.buy:hover{border-color:var(--green)}
+.pendcard{background:#eef5ee;border-color:#cfe3cf}
 .sheet{position:fixed;inset:0;z-index:50;background:rgba(10,20,20,.45);display:flex;align-items:flex-end;justify-content:center}
 .sheet>div{background:var(--paper);width:100%;max-width:760px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom))}
 .sheet .grab{width:40px;height:4px;background:var(--line);border-radius:4px;margin:0 auto 10px}
@@ -333,12 +336,14 @@ function openAccount(){
     <label>Display name</label><input type="text" id="dn" value="${esc(S.profile?.display_name||"")}">
     <div class="row" style="margin-top:12px"><button class="btn" id="saveDn">Save</button><button class="btn alt" id="out">Sign out</button></div>
     <p class="small muted" id="aiLeft"></p>
+    <label>Shop for materials at</label><select id="shopSel">${Object.entries(SHOPS).map(([k,v])=>`<option value="${k}" ${shopKey()===k?"selected":""}>${v.name}</option>`).join("")}</select>
     <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
     <p class="small"><a href="/privacy.html" target="_blank" rel="noopener">Privacy policy</a>${S.hidden?.size?` · <a href="#" id="unhide">Show hidden members (${S.hidden.size})</a>`:""}</p>
     <button class="btn danger" id="delAcct" style="width:100%">Delete my account</button>
     <p class="small muted" style="margin-top:6px">Permanently deletes your login, recipes, materials inventory and fish log.</p>`);
   sb.from("ai_usage").select("count").eq("day", new Date().toISOString().slice(0,10)).maybeSingle().then(({data})=>{ $("#aiLeft",s).textContent = `Photo IDs used today: ${data?.count||0} of 20`; });
   $("#saveDn",s).onclick = async()=>{ await sb.from("profiles").update({display_name:$("#dn",s).value.trim()}).eq("id",S.user.id); await refreshUser(); s.remove(); toast("Saved"); };
+  $("#shopSel",s).onchange = e=>{ lsSet("fb_shop", e.target.value); toast("Saved"); };
   $("#out",s).onclick = async()=>{ await sb.auth.signOut(); s.remove(); await afterAuth(); };
   if($("#unhide",s)) $("#unhide",s).onclick = async e=>{ e.preventDefault(); await sb.from("hidden_authors").delete().eq("user_id", S.user.id); s.remove(); S.flies=null; toast("Hidden members shown again"); render(); };
   $("#delAcct",s).onclick = async()=>{
@@ -427,7 +432,7 @@ function openFly(id){
     ${f.description?`<p>${esc(f.description)}</p>`:""}
     ${f.fishing_tips?`<div class="card"><h3>How to fish it</h3><p class="small" style="margin:6px 0 0">${esc(f.fishing_tips)}</p></div>`:""}
     <div class="card"><div class="row"><h3 class="grow">Materials</h3>${S.user?`<span class="small muted">vs. your bench</span>`:""}</div>
-      <ul style="list-style:none;padding:0;margin:8px 0 0">${mats.map(m=>{ const st=matStatus(m); const ph=catPhotoUrl(m.category,96); return `<li style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px"><span class="matthumb sm">${ph?`<img src="${ph}" alt="" loading="lazy">`:FLY_ICON}</span><span>${st?`<span class="dot ${st}"></span>`:""}<b>${esc(m.part||"")}</b>${m.part?": ":""}${esc(m.material_text)}</span></li>`; }).join("")}</ul><p class="small muted" style="margin:6px 0 0">Material pictures show the type of material. <a href="#" class="matCred">Photo credits</a></p>
+      <ul style="list-style:none;padding:0;margin:8px 0 0">${mats.map(m=>{ const st=matStatus(m); const ph=catPhotoUrl(m.category,96); return `<li style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px"><span class="matthumb sm">${ph?`<img src="${ph}" alt="" loading="lazy">`:FLY_ICON}</span><span>${st?`<span class="dot ${st}"></span>`:""}<b>${esc(m.part||"")}</b>${m.part?": ":""}${esc(m.material_text)}</span>${st!=="have"?`<span style="margin-left:auto">${buyLink({ label:m.material_text, material_id:m.material_id||null, category:m.category||"other" })}</span>`:""}</li>`; }).join("")}</ul><p class="small muted" style="margin:6px 0 0">Material pictures show the type of material. <a href="#" class="matCred">Photo credits</a></p>
       ${S.user && S.inventory.length?`<p class="small muted" style="margin:8px 0 0"><span class="dot have"></span>have <span class="dot maybe" style="margin-left:8px"></span>have something similar <span class="dot need" style="margin-left:8px"></span>need</p>`:""}
       ${needList.length?`<button class="btn sm alt" style="margin-top:10px" id="copyNeed">Copy shopping list (${needList.length})</button>`:""}
     </div>
@@ -439,6 +444,7 @@ function openFly(id){
     <button class="btn alt" style="width:100%" id="closeF">Close</button>`);
   $("#closeF",s).onclick=()=>s.remove();
   s.querySelectorAll(".matCred").forEach(x=>x.onclick=e=>{ e.preventDefault(); showPhotoCredits(); });
+  wireBuyLinks(s);
   if($("#repF",s)) $("#repF",s).onclick=async()=>{ if(!requireUser()) return;
     const reason = prompt("What's wrong with this recipe? (e.g. offensive, spam, copied without credit, unsafe)");
     if(!reason || !reason.trim()) return;
@@ -561,6 +567,7 @@ async function renderInventory(){
       <button class="btn brass grow" id="scanBtn">📷 Scan barcode</button>
       <button class="btn alt" id="rcptBtn">🧾 Receipt</button>
     </div>
+    ${pendingBuys().length?`<div class="card row pendcard" id="pendC" style="padding:10px 12px"><span class="grow">🛒 Bought anything? ${pendingBuys().length} item${pendingBuys().length>1?"s":""} waiting to add.</span><button class="btn sm">Add to bench</button></div>`:""}
     <input type="search" id="iq" placeholder="Search your materials…" value="${esc(invQ)}">
     <div class="chips" style="margin-top:8px"><span class="chip ${!invLowOnly?"on":""}" id="allI">All (${S.inventory.length})</span><span class="chip ${invLowOnly?"on":""}" id="lowI">Low / out (${low.length})</span>${low.length?`<span class="chip" id="copyLow">Copy shopping list</span>`:""}</div>
     ${Object.keys(groups).length ? CATEGORIES.filter(c=>groups[c]).map(c=>`<h3 style="margin:14px 0 8px">${CAT_LABEL[c]}</h3>${groups[c].map(invRow).join("")}`).join("") :
@@ -571,6 +578,7 @@ async function renderInventory(){
   $("#allI").onclick=()=>{ invLowOnly=false; renderInventory(); };
   $("#lowI").onclick=()=>{ invLowOnly=true; renderInventory(); };
   if($("#copyLow")) $("#copyLow").onclick=async()=>{ const txt="Fly tying shopping list:\n"+low.map(i=>`• ${matLabel(i.material)}`).join("\n"); try{ await navigator.clipboard.writeText(txt); toast("Copied"); }catch{ sheet(`<textarea style="min-height:200px">${esc(txt)}</textarea>`); } };
+  wireBuyLinks(view); if($("#pendC")) $("#pendC").onclick=()=>askPurchases();
   $("#scanBtn").onclick=()=>openScanner();
   $("#rcptBtn").onclick=()=>openReceipt();
   view.querySelectorAll("[data-inc]").forEach(b=>b.onclick=async e=>{ e.stopPropagation(); await adjust(+b.dataset.mat, +b.dataset.inc, "manual"); renderInventory(); });
@@ -578,12 +586,73 @@ async function renderInventory(){
   fab("+ Add material", ()=>pickMaterial({ title:"Add material", onPick: async m => { await adjust(m.id, 1, "manual"); toast(`Added ${m.name}`); renderInventory(); } }));
 }
 const matLabel = m => [m.brand, m.name, m.color, m.size].filter(Boolean).join(" · ");
+
+/* ---------------- buying materials ---------------- */
+const SHOPS = {
+  google: { name:"Google Shopping (compare stores)", url:q=>`https://www.google.com/search?tbm=shop&q=${encodeURIComponent(q)}` },
+  amazon: { name:"Amazon", url:q=>`https://www.amazon.com/s?k=${encodeURIComponent(q)}` },
+  ebay:   { name:"eBay", url:q=>`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}` },
+};
+const lsGet=(k,d)=>{ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch{ return d; } };
+const lsSet=(k,v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} };
+const shopKey = () => SHOPS[lsGet("fb_shop","google")] ? lsGet("fb_shop","google") : "google";
+const shopQuery = q => /fly|hook|thread|bucktail|dubbing|chenille|flash|marabou|eyes/i.test(q) ? q : `${q} fly tying`;
+const shopUrl = q => SHOPS[shopKey()].url(shopQuery(String(q).replace(/\s*·\s*/g," ")));
+// Things the user tapped Buy on. We can't see the store's checkout, so we ask when they come back.
+const pendingBuys = () => S.user ? lsGet("fb_pending_"+S.user.id, []) : [];
+const setPending = list => S.user && lsSet("fb_pending_"+S.user.id, list);
+function buyLink({ label, material_id=null, category="other" }){
+  return `<a class="buy" href="${shopUrl(label)}" target="_blank" rel="noopener" data-buy="${esc(JSON.stringify({label, material_id, category}))}">🛒 Buy</a>`;
+}
+function wireBuyLinks(root){
+  root.querySelectorAll("[data-buy]").forEach(a=>a.onclick=e=>{
+    e.stopPropagation();
+    if(!S.user) return; // link still opens; nothing to track without a bench
+    const it = JSON.parse(a.dataset.buy); it.key = it.material_id ? "m"+it.material_id : "t"+it.label.toLowerCase(); it.at = Date.now();
+    setPending([...pendingBuys().filter(x=>x.key!==it.key), it]);
+  });
+}
+let pendAsked = 0;
+function maybeAskPurchases(){
+  if(!S.user || document.hidden || document.querySelector(".pendsheet")) return;
+  const list = pendingBuys().filter(x => Date.now()-x.at > 15000);
+  if(!list.length || Date.now()-pendAsked < 60000) return;
+  pendAsked = Date.now(); askPurchases();
+}
+function askPurchases(){
+  const list = pendingBuys(); if(!list.length) return toast("Nothing waiting");
+  const s = sheet(`<div class="pendsheet"><h2>Did you buy these?</h2>
+    <p class="small muted">Tick what you bought and how many packs or spools. They'll be added to your bench.</p>
+    ${list.map((it,i)=>`<div class="edit-row row" data-i="${i}"><input type="checkbox" checked style="width:auto"><div class="grow"><b>${esc(it.label)}</b></div><input type="number" min="0.5" step="0.5" value="1" style="width:64px"></div>`).join("")}
+    <button class="btn" style="width:100%;margin-top:12px" id="pAdd">Add to my bench</button>
+    <div class="row" style="margin-top:8px"><button class="btn alt grow" id="pLater">Not yet</button><button class="btn ghost grow" id="pClear">Didn't buy them</button></div></div>`);
+  $("#pLater",s).onclick=()=>{ s.remove(); };
+  $("#pClear",s).onclick=()=>{ setPending([]); s.remove(); render(); };
+  $("#pAdd",s).onclick=async()=>{
+    const btn=$("#pAdd",s); btn.disabled=true; btn.innerHTML=`<span class="spinner"></span> Adding…`;
+    const rows=[...s.querySelectorAll("[data-i]")], keep=[], toPick=[]; let n=0;
+    for(const r of rows){ const it=list[+r.dataset.i], qty=Number(r.querySelector("input[type=number]").value)||1;
+      if(!r.querySelector("input[type=checkbox]").checked){ keep.push(it); continue; }
+      let id = it.material_id;
+      if(!id){ const { data } = await sb.from("materials").select("id").ilike("name", it.label).limit(1); id = data?.[0]?.id; }
+      if(id){ try{ await adjust(id, qty, "purchase"); n++; }catch{ keep.push(it); } } else toPick.push({ ...it, qty });
+    }
+    setPending(keep); s.remove();
+    if(n) toast(`Added ${n} to your bench`);
+    // Recipe materials that aren't in the catalog yet: name them once, then add.
+    const next = () => { const it = toPick.shift(); if(!it){ render(); return; }
+      pickMaterial({ title:`Add "${it.label}"`, prefill:{ name:it.label, category:it.category }, onPick: async m => { await adjust(m.id, it.qty, "purchase"); toast(`Added ${m.name}`); next(); } }); };
+    next();
+  };
+}
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) setTimeout(maybeAskPurchases, 600); });
+window.addEventListener("focus", ()=>setTimeout(maybeAskPurchases, 600));
 function invRow(i){
   const isLow = Number(i.quantity) <= Number(i.low_stock_at ?? 0);
   const own = benchPhoto(i), ph = own || catPhotoUrl(i.material.category);
   return `<div class="card row ${isLow?"low":""}" data-inv="${i.id}" style="padding:10px 12px">
     <div class="matthumb${own?" own":""}">${ph?`<img src="${ph}" alt="" loading="lazy">`:FLY_ICON}${own?"":`<span class="addph" title="Add your photo">📷</span>`}</div>
-    <div class="grow"><b>${esc(i.material.name)}</b><div class="small muted">${esc([i.material.brand,i.material.color,i.material.size].filter(Boolean).join(" · "))}${i.storage_location?` · 📍${esc(i.storage_location)}`:""}</div>${isLow?`<div class="small need">${Number(i.quantity)===0?"Out":"Low"}</div>`:""}</div>
+    <div class="grow"><b>${esc(i.material.name)}</b><div class="small muted">${esc([i.material.brand,i.material.color,i.material.size].filter(Boolean).join(" · "))}${i.storage_location?` · 📍${esc(i.storage_location)}`:""}</div>${isLow?`<div class="small need">${Number(i.quantity)===0?"Out":"Low"} ${buyLink({ label:matLabel(i.material), material_id:i.material_id, category:i.material.category })}</div>`:""}</div>
     <div class="qty"><button data-inc="-1" data-mat="${i.material_id}">−</button><b>${Number(i.quantity)}</b><button data-inc="1" data-mat="${i.material_id}">+</button></div></div>`;
 }
 async function adjust(materialId, delta, source){
