@@ -310,10 +310,11 @@ function openAuth(){
     <div id="nameWrap" class="hide"><label>Display name</label><input type="text" id="aName" placeholder="What others see on your recipes"></div>
     <label>Email</label><input type="email" id="aEmail" autocomplete="email">
     <label>Password</label><input type="password" id="aPass" autocomplete="current-password">
+    <label class="row hide" id="nlWrap" style="gap:8px;align-items:flex-start;margin-top:12px;font-weight:400"><input type="checkbox" id="aNews" style="width:auto;margin-top:3px"><span class="small">Email me the weekly Fly Tying Recipes blog: one tip, technique or pattern a week. Unsubscribe any time.</span></label>
     <div class="row" style="margin-top:14px"><button class="btn grow" id="aGo">Sign in</button></div>
     <p class="small"><a href="#" id="aForgot">Forgot password?</a></p>`);
   let mode="in";
-  s.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{ mode=b.dataset.m; s.querySelectorAll(".seg button").forEach(x=>x.classList.toggle("on", x===b)); $("#nameWrap",s).classList.toggle("hide", mode==="in"); $("#aGo",s).textContent = mode==="in"?"Sign in":"Create account"; });
+  s.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{ mode=b.dataset.m; s.querySelectorAll(".seg button").forEach(x=>x.classList.toggle("on", x===b)); $("#nameWrap",s).classList.toggle("hide", mode==="in"); $("#nlWrap",s).classList.toggle("hide", mode==="in"); $("#aGo",s).textContent = mode==="in"?"Sign in":"Create account"; });
   $("#aGo",s).onclick = async () => {
     const email=$("#aEmail",s).value.trim(), password=$("#aPass",s).value;
     if(!email || password.length<6) return toast("Enter email and a password of 6+ characters");
@@ -321,7 +322,7 @@ function openAuth(){
     const redirect = location.origin + location.pathname;
     const r = mode==="in"
       ? await sb.auth.signInWithPassword({ email, password })
-      : await sb.auth.signUp({ email, password, options:{ data:{ display_name:$("#aName",s).value.trim() || email.split("@")[0] }, emailRedirectTo: redirect } });
+      : await sb.auth.signUp({ email, password, options:{ data:{ display_name:$("#aName",s).value.trim() || email.split("@")[0], newsletter: $("#aNews",s).checked ? "true" : "false" }, emailRedirectTo: redirect } });
     $("#aGo",s).disabled=false;
     if(r.error) return toast(r.error.message, 4000);
     if(mode==="up" && !r.data.session){ s.remove(); return toast("Check your email to confirm your account", 5000); }
@@ -336,6 +337,7 @@ function openAccount(){
     <label>Display name</label><input type="text" id="dn" value="${esc(S.profile?.display_name||"")}">
     <div class="row" style="margin-top:12px"><button class="btn" id="saveDn">Save</button><button class="btn alt" id="out">Sign out</button></div>
     <p class="small muted" id="aiLeft"></p>
+    <label class="row" style="gap:8px;align-items:flex-start;margin-top:10px;font-weight:400"><input type="checkbox" id="nlToggle" style="width:auto;margin-top:3px" disabled><span class="small">Weekly email: one fly tying tip, technique or pattern a week from the Fly Tying Recipes blog.</span></label>
     <label>Shop for materials at</label><select id="shopSel">${Object.entries(SHOPS).map(([k,v])=>`<option value="${k}" ${shopKey()===k?"selected":""}>${v.name}</option>`).join("")}</select>
     <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
     <p class="small"><a href="/privacy.html" target="_blank" rel="noopener">Privacy policy</a>${S.hidden?.size?` · <a href="#" id="unhide">Show hidden members (${S.hidden.size})</a>`:""}</p>
@@ -343,6 +345,8 @@ function openAccount(){
     <p class="small muted" style="margin-top:6px">Permanently deletes your login, recipes, materials inventory and fish log.</p>`);
   sb.from("ai_usage").select("count").eq("day", new Date().toISOString().slice(0,10)).maybeSingle().then(({data})=>{ $("#aiLeft",s).textContent = `Photo IDs used today: ${data?.count||0} of 20`; });
   $("#saveDn",s).onclick = async()=>{ await sb.from("profiles").update({display_name:$("#dn",s).value.trim()}).eq("id",S.user.id); await refreshUser(); s.remove(); toast("Saved"); };
+  sb.rpc("my_newsletter").then(({data})=>{ const c=$("#nlToggle",s); if(c){ c.checked=!!data; c.disabled=false; } });
+  $("#nlToggle",s).onchange = async e=>{ const on=e.target.checked; e.target.disabled=true; const { error } = await sb.rpc("set_newsletter", { p_on:on }); e.target.disabled=false; if(error){ e.target.checked=!on; return toast("Couldn't change your email setting"); } toast(on?"You're on the weekly email":"You won't get the weekly email"); };
   $("#shopSel",s).onchange = e=>{ lsSet("fb_shop", e.target.value); toast("Saved"); };
   $("#out",s).onclick = async()=>{ await sb.auth.signOut(); s.remove(); await afterAuth(); };
   if($("#unhide",s)) $("#unhide",s).onclick = async e=>{ e.preventDefault(); await sb.from("hidden_authors").delete().eq("user_id", S.user.id); s.remove(); S.flies=null; toast("Hidden members shown again"); render(); };
@@ -583,9 +587,25 @@ async function renderInventory(){
   $("#rcptBtn").onclick=()=>openReceipt();
   view.querySelectorAll("[data-inc]").forEach(b=>b.onclick=async e=>{ e.stopPropagation(); await adjust(+b.dataset.mat, +b.dataset.inc, "manual"); renderInventory(); });
   view.querySelectorAll("[data-inv]").forEach(r=>r.onclick=()=>editInvItem(S.inventory.find(i=>i.id===+r.dataset.inv)));
-  fab("+ Add material", ()=>pickMaterial({ title:"Add material", onPick: async m => { await adjust(m.id, 1, "manual"); toast(`Added ${m.name}`); renderInventory(); } }));
+  fab("+ Add material", ()=>{ const s=pickMaterial({ title:"Add material", onPick: async m => { await adjust(m.id, 1, "manual"); toast(`Added ${m.name}`); renderInventory(); } });
+    const h=s.querySelector("h2"); const b=document.createElement("button"); b.className="btn brass"; b.style.cssText="width:100%;margin:4px 0 10px"; b.textContent="📷 Scan the UPC barcode instead"; b.onclick=()=>{ s.remove(); openScanner(); }; h.after(b); });
 }
 const matLabel = m => [m.brand, m.name, m.color, m.size].filter(Boolean).join(" · ");
+
+/* ---------------- weekly email sign-up (no account needed) ---------------- */
+const NEWSLETTER_FN = "https://rkxzfzzjzrnkiyopbdke.supabase.co/functions/v1/newsletter";
+function openSubscribe(){
+  if(S.user) return openAccount();
+  const s=sheet(`<h2>Get the weekly email</h2><p class="muted small">One fly tying tip, technique or pattern a week from the Fly Tying Recipes blog. Free, and you can unsubscribe any time.</p>
+    <label>Email</label><input type="email" id="subEmail" autocomplete="email" placeholder="you@example.com">
+    <button class="btn" id="subGo" style="width:100%;margin-top:12px">Sign me up</button><p class="small muted" id="subMsg"></p>`);
+  $("#subGo",s).onclick=async()=>{ const b=$("#subGo",s), email=$("#subEmail",s).value.trim(); if(!email) return; b.disabled=true;
+    try{ const r=await fetch(NEWSLETTER_FN,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"subscribe",email})}); const j=await r.json();
+      if(!r.ok) throw new Error(j.error||"Something went wrong");
+      $("#subMsg",s).textContent = j.already ? "You're already signed up. Thanks!" : j.pending ? "Thanks! You're on the list. We'll email you a link to confirm." : "Almost done: check your email and tap the link to confirm.";
+      b.textContent="Done"; b.onclick=()=>s.remove(); b.disabled=false;
+    }catch(err){ $("#subMsg",s).textContent=err.message; b.disabled=false; } };
+}
 
 /* ---------------- buying materials ---------------- */
 const SHOPS = {
@@ -960,6 +980,7 @@ sb.auth.onAuthStateChange((evt)=>{ if(evt==="SIGNED_IN"||evt==="SIGNED_OUT") aft
   if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("/sw.js").catch(()=>{});
   const wantDelete = location.hash==="#delete-account";
   if(wantDelete){ history.replaceState(null,"",location.pathname); if(S.user) openAccount(); else { S.pendingAccount=true; openAuth(); } }
+  if(location.hash==="#subscribe"){ history.replaceState(null,"",location.pathname); openSubscribe(); }
   const wantNew = location.hash==="#new";
   if(wantNew){ history.replaceState(null,"",location.pathname); S.tab="flies"; document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("on",x.dataset.tab==="flies")); }
   await render();
