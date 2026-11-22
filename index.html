@@ -101,7 +101,11 @@ ol.steps img{width:100%;border-radius:10px;margin-top:8px}
 .yt-prev img{width:96px;aspect-ratio:16/9;object-fit:cover;border-radius:6px}
 .hero.fit{object-fit:contain;background:#141a1c}
 .matthumb{width:48px;height:48px;flex:none;border-radius:8px;overflow:hidden;background:#e9e3d4;display:grid;place-items:center;color:var(--brass,#b8862b)}
+.matthumb{position:relative}
 .matthumb img{width:100%;height:100%;object-fit:cover}
+.matthumb .addph{position:absolute;right:-2px;bottom:-2px;font-size:12px;background:#fff;border-radius:50%;width:18px;height:18px;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.benchph{display:flex;gap:12px;align-items:center;margin:10px 0}
+.benchph img{width:96px;height:96px;object-fit:cover;border-radius:10px;background:#e9e3d4}
 .matthumb svg{width:24px;height:24px}
 .matthumb.sm{width:34px;height:34px;border-radius:6px}
 .matthumb.sm svg{width:18px;height:18px}
@@ -253,7 +257,12 @@ async function loadInventory(){
   const { data, error } = await sb.from("inventory").select("*, material:materials(*)").order("updated_at", {ascending:false});
   if(error) console.error(error);
   S.inventory = data || [];
+  // Bench photos are private: get short-lived links for the ones we show.
+  const paths = S.inventory.map(i=>i.photo_path).filter(Boolean);
+  S.benchUrls = {};
+  if(paths.length){ const { data: urls } = await sb.storage.from("bench-photos").createSignedUrls(paths, 3600); (urls||[]).forEach(u=>{ if(u.signedUrl) S.benchUrls[u.path]=u.signedUrl; }); }
 }
+const benchPhoto = i => i.photo_path && S.benchUrls?.[i.photo_path];
 async function loadCatches(){
   if(!S.user){ S.catches=[]; return; }
   const { data } = await sb.from("catches").select("*").order("caught_at", {ascending:false});
@@ -571,9 +580,9 @@ async function renderInventory(){
 const matLabel = m => [m.brand, m.name, m.color, m.size].filter(Boolean).join(" · ");
 function invRow(i){
   const isLow = Number(i.quantity) <= Number(i.low_stock_at ?? 0);
-  const ph = catPhotoUrl(i.material.category);
+  const own = benchPhoto(i), ph = own || catPhotoUrl(i.material.category);
   return `<div class="card row ${isLow?"low":""}" data-inv="${i.id}" style="padding:10px 12px">
-    <div class="matthumb">${ph?`<img src="${ph}" alt="" loading="lazy">`:FLY_ICON}</div>
+    <div class="matthumb${own?" own":""}">${ph?`<img src="${ph}" alt="" loading="lazy">`:FLY_ICON}${own?"":`<span class="addph" title="Add your photo">📷</span>`}</div>
     <div class="grow"><b>${esc(i.material.name)}</b><div class="small muted">${esc([i.material.brand,i.material.color,i.material.size].filter(Boolean).join(" · "))}${i.storage_location?` · 📍${esc(i.storage_location)}`:""}</div>${isLow?`<div class="small need">${Number(i.quantity)===0?"Out":"Low"}</div>`:""}</div>
     <div class="qty"><button data-inc="-1" data-mat="${i.material_id}">−</button><b>${Number(i.quantity)}</b><button data-inc="1" data-mat="${i.material_id}">+</button></div></div>`;
 }
@@ -584,7 +593,15 @@ async function adjust(materialId, delta, source){
 }
 function editInvItem(i){
   const m=i.material, mine = m.created_by===S.user.id;
+  let photo = i.photo_path, photoFile = null;
+  const cur = benchPhoto(i) || catPhotoUrl(m.category, 240);
   const s=sheet(`<h2>${esc(m.name)}</h2><p class="small muted">${esc(matLabel(m))}</p>
+    <div class="benchph"><img id="bpPrev" src="${cur||""}" alt="" class="${cur?"":"hide"}">
+      <div><label style="margin:0">Your photo</label>
+        <p class="small muted" style="margin:2px 0 6px">${photo?"This is your own photo.":cur?"Showing an example of this material type. Add a photo of your actual pack or spool.":"Add a photo of your actual pack or spool."}</p>
+        <input type="file" accept="image/*" id="bpFile">
+        ${photo?`<button class="btn sm ghost" id="bpDel" style="margin-top:6px">Remove my photo</button>`:""}</div></div>
+    <p class="small muted" style="margin-top:-4px">Only you can see your bench photos.</p>
     <div class="row"><div class="grow"><label>Quantity</label><input type="number" min="0" step="0.5" id="q" value="${Number(i.quantity)}"></div>
     <div class="grow"><label>Warn when at or below</label><input type="number" min="0" step="0.5" id="lw" value="${Number(i.low_stock_at??1)}"></div></div>
     <label>Where it's stored</label><input type="text" id="loc" value="${esc(i.storage_location||"")}" placeholder="Drawer 2, saltwater box…">
@@ -593,13 +610,20 @@ function editInvItem(i){
       <label>Name</label><input type="text" id="mn" value="${esc(m.name)}"><div class="row"><div class="grow"><label>Brand</label><input type="text" id="mb" value="${esc(m.brand||"")}"></div><div class="grow"><label>Color</label><input type="text" id="mc" value="${esc(m.color||"")}"></div></div>
       <div class="row"><div class="grow"><label>Size</label><input type="text" id="ms" value="${esc(m.size||"")}"></div><div class="grow"><label>Category</label><select id="mcat">${CATEGORIES.map(c=>`<option value="${c}" ${m.category===c?"selected":""}>${CAT_LABEL[c]}</option>`).join("")}</select></div></div></details>`:""}
     <div class="row" style="margin-top:14px"><button class="btn grow" id="sv">Save</button><button class="btn danger" id="rm">Remove</button></div>`);
+  $("#bpFile",s).onchange=e=>{ photoFile=e.target.files[0]; if(photoFile){ const p=$("#bpPrev",s); p.src=URL.createObjectURL(photoFile); p.classList.remove("hide"); } };
+  if($("#bpDel",s)) $("#bpDel",s).onclick=e=>{ photo=null; photoFile=null; const ex=catPhotoUrl(m.category,240), p=$("#bpPrev",s); if(ex) p.src=ex; else p.classList.add("hide"); e.target.remove(); };
   $("#sv",s).onclick=async()=>{
+    const btn=$("#sv",s); btn.disabled=true; btn.innerHTML=`<span class="spinner"></span> Saving…`;
     const newQ = Number($("#q",s).value)||0;
-    await sb.from("inventory").update({ quantity:newQ, low_stock_at:Number($("#lw",s).value)||0, storage_location:$("#loc",s).value.trim()||null, notes:$("#nt",s).value.trim()||null }).eq("id",i.id);
+    const oldPhoto = i.photo_path;
+    try{ if(photoFile) photo = await uploadPhoto("bench-photos", photoFile, 1200); }
+    catch(err){ toast("Couldn't upload the photo: "+(err.message||err)); btn.disabled=false; btn.textContent="Save"; return; }
+    await sb.from("inventory").update({ quantity:newQ, low_stock_at:Number($("#lw",s).value)||0, storage_location:$("#loc",s).value.trim()||null, notes:$("#nt",s).value.trim()||null, photo_path:photo||null }).eq("id",i.id);
+    if(oldPhoto && oldPhoto!==photo) sb.storage.from("bench-photos").remove([oldPhoto]);
     if(newQ!==Number(i.quantity)) await sb.from("inventory_events").insert({ material_id:i.material_id, delta:newQ-Number(i.quantity), source:"manual" });
     if(mine) await sb.from("materials").update({ name:$("#mn",s).value.trim()||m.name, brand:$("#mb",s).value.trim()||null, color:$("#mc",s).value.trim()||null, size:$("#ms",s).value.trim()||null, category:$("#mcat",s).value }).eq("id",m.id);
     s.remove(); renderInventory(); };
-  $("#rm",s).onclick=async()=>{ if(!confirm("Remove from your inventory?")) return; await sb.from("inventory").delete().eq("id",i.id); s.remove(); renderInventory(); };
+  $("#rm",s).onclick=async()=>{ if(!confirm("Remove from your inventory?")) return; await sb.from("inventory").delete().eq("id",i.id); if(i.photo_path) sb.storage.from("bench-photos").remove([i.photo_path]); s.remove(); renderInventory(); };
 }
 /* material picker: search shared catalog or create */
 function pickMaterial({ title, barcode=null, prefill={}, onPick }){
