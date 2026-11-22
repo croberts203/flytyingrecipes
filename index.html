@@ -99,6 +99,8 @@ ol.steps img{width:100%;border-radius:10px;margin-top:8px}
 .yt.hero{margin:0 0 12px;border-radius:var(--r)}
 .yt-prev{display:flex;align-items:center;gap:10px;margin-top:6px}
 .yt-prev img{width:96px;aspect-ratio:16/9;object-fit:cover;border-radius:6px}
+.credit{margin:-6px 0 10px}
+.credit a{color:inherit}
 .media-tag{position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.65);color:#fff;font:600 .7rem/1 Inter;padding:3px 5px;border-radius:5px}
 .thumb{position:relative}
 .req{color:#b3412e}
@@ -170,7 +172,9 @@ const ytCanon = u => { const p = ytParse(u); return p ? `https://www.youtube.com
 const ytThumb = u => { const p = ytParse(u); return p ? `https://i.ytimg.com/vi/${p.id}/hqdefault.jpg` : null; };
 const ytEmbed = (u, cls="") => { const p = ytParse(u); if(!p) return "";
   return `<div class="yt ${cls}"><iframe src="https://www.youtube-nocookie.com/embed/${p.id}?rel=0&playsinline=1${p.start?`&start=${p.start}`:""}" title="YouTube video" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`; };
-const flyThumb = f => flyPhotoUrl(f.cover_photo_path) || ytThumb(f.youtube_url) || ytThumb([...(f.fly_steps||[])].sort((a,b)=>a.step_no-b.step_no).find(x=>x.youtube_url)?.youtube_url);
+const commonsUrl = (u, w) => u && /^https:\/\/commons\.wikimedia\.org\//.test(u) ? u.replace(/width=\d+/, "width="+w) : null;
+const photoCredit = f => f.photo_credit && f.photo_source_url ? `<p class="small muted credit">Photo: <a href="${esc(f.photo_source_url)}" target="_blank" rel="noopener">${esc(f.photo_credit.replace(/, (CC .*|public domain)$/i,""))}</a>, ${f.photo_license_url?`<a href="${esc(f.photo_license_url)}" target="_blank" rel="noopener">${esc((f.photo_credit.match(/CC [^,]+$/)||["license"])[0])}</a>`:"public domain"}, via Wikimedia Commons. Example of the pattern, not tied by Fly Bench.</p>` : "";
+const flyThumb = f => flyPhotoUrl(f.cover_photo_path) || commonsUrl(f.photo_url, 400) || ytThumb(f.youtube_url) || ytThumb([...(f.fly_steps||[])].sort((a,b)=>a.step_no-b.step_no).find(x=>x.youtube_url)?.youtube_url);
 const uid = () => crypto.randomUUID();
 const fmtDate = d => new Date(d).toLocaleString([], {month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit"});
 function requireUser(){ if(!S.user){ openAuth(); return false; } return true; }
@@ -378,11 +382,12 @@ function openFly(id){
   const sp = (f.fly_species||[]).map(x=>speciesById(x.species_id)).filter(Boolean);
   const mats = [...(f.fly_materials||[])].sort((a,b)=>a.sort-b.sort);
   const steps = [...(f.fly_steps||[])].sort((a,b)=>a.step_no-b.step_no);
-  const img = flyPhotoUrl(f.cover_photo_path);
+  const img = flyPhotoUrl(f.cover_photo_path) || commonsUrl(f.photo_url, 800);
   const mine = S.user && f.author_id===S.user.id;
   const needList = mats.filter(m=>matStatus(m)==="need");
   const s = sheet(`
-    ${f.youtube_url?ytEmbed(f.youtube_url,"hero"):img?`<img class="hero" src="${img}" alt="">`:""}
+    ${f.youtube_url?ytEmbed(f.youtube_url,"hero"):img?`<img class="hero" src="${img}" alt="${esc(f.name)}">`:""}
+    ${!f.cover_photo_path && !f.youtube_url ? photoCredit(f) : ""}
     <div class="row"><h2 class="grow">${esc(f.name)}</h2>${mine?`<button class="btn sm alt" id="editF">Edit</button>`:""}</div>
     <div class="small muted" style="margin:4px 0 8px">${esc(f.fly_type||"")} · ${esc(f.difficulty||"")} · Hooks ${esc(f.hook_sizes||"—")}<br>${f.is_starter?"Starter pattern":`Shared by ${esc(f.author?.display_name||"a member")}`}</div>
     <div>${sp.map(x=>`<span class="tag">${esc(x.common_name)}</span>`).join("")}</div>
