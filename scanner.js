@@ -61,15 +61,18 @@
     return canvas;
   }
 
-  function start(video, onCode) {
-    var running = true, timer = null;
+  function start(video, onCode, onInfo) {
+    var running = true, timer = null, frames = 0, lastInfo = 0;
+    function info(extra) { var now = Date.now(); if (!onInfo || (now - lastInfo < 1200 && !extra)) return; lastInfo = now;
+      try { onInfo({ mode: native ? "built-in reader" : (window.ZXing ? "ZXing reader" : "loading reader"), frames: frames, size: (video.videoWidth || 0) + "×" + (video.videoHeight || 0), note: extra || "" }); } catch (e) {} }
     var native = ("BarcodeDetector" in window) ? new window.BarcodeDetector({ formats: FORMATS }) : null;
     var canvas = document.createElement("canvas"), turn = 0;
     function emit(c) { c = normalize(c); if (c) onCode(c); }
     function schedule(ms) { if (running) timer = setTimeout(tick, ms); }
     function tick() {
       if (!running) return;
-      if (video.readyState < 2 || !video.videoWidth) return schedule(200);
+      if (video.readyState < 2 || !video.videoWidth) { info(); return schedule(200); }
+      frames++; info();
       if (native) {
         native.detect(video).then(function (r) { if (running && r && r[0]) emit(r[0].rawValue); }).catch(function () {}).then(function () { schedule(250); });
         return;

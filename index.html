@@ -782,6 +782,7 @@ async function openScanner(){
   el.innerHTML=`<video playsinline muted autoplay></video><div class="frame"></div>
     <div class="bar"><div class="modes"><span class="chip on" data-mode="add">Bought (+1)</span><span class="chip" data-mode="use">Used up (−1)</span><span class="chip" data-mode="haul">Haul mode</span></div>
     <div id="scanMsg" class="small">Point the camera at the barcode on the package.</div>
+    <div id="scanInfo" class="small" style="opacity:.6;font-size:.72rem;margin-top:2px"></div>
     <div id="haulList" class="small" style="margin-top:6px"></div>
     <div class="row" style="margin-top:10px"><button class="btn alt grow" id="photoCode">📸 Photo</button><button class="btn alt grow" id="manualCode">Type code</button><button class="btn brass grow hide" id="haulSave">Save haul</button><button class="btn grow" id="scanDone">Done</button></div></div>`;
   document.body.appendChild(el);
@@ -819,13 +820,14 @@ async function openScanner(){
   }
   try{
     const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment", width:{ideal:1280}, height:{ideal:720} } });
-    video.srcObject=stream; await video.play();
+    video.muted=true; video.playsInline=true; video.setAttribute("playsinline",""); video.setAttribute("muted","");
+    video.srcObject=stream; try{ await video.play(); }catch(e){ /* iOS may start it on its own (autoplay); the reader waits for frames */ }
     let running=true;
     scanState.stop=()=>{ running=false; stream.getTracks().forEach(t=>t.stop()); };
     if(!window.FBScan){ $("#scanMsg",el).textContent="Barcode reader didn't load. Tap “📸 Photo” or “Type code”."; return; }
     const stopRead = FBScan.start(video, (code, err)=>{
       if(err){ $("#scanMsg",el).textContent = err.message+" You can also tap “📸 Photo”."; return; }
-      handleCode(code); });
+      handleCode(code); }, i=>{ const n=$("#scanInfo",el); if(n) n.textContent=`${i.mode} · camera ${i.size} · checked ${i.frames} frames`; });
     const prevStop = scanState.stop; scanState.stop = ()=>{ stopRead(); prevStop(); };
   }catch(err){ console.error(err); $("#scanMsg",el).textContent="Camera unavailable. Allow camera access for this site, or tap “📸 Photo” or “Type code”."; }
 }
