@@ -59,6 +59,7 @@
   var pending = null;
   function check() {
     pending = null;
+    if (window.FBFeatures && !FBFeatures.isOn("tips")) return;
     if (Tour.active() || (/[?&]demo/.test(location.search) && !/[?&]tips/.test(location.search))) return;
     // features that open over the page come first
     if (visible("#scanner")) return Tour.later("fb.scanner", T.scanner, { delay: 700 });
