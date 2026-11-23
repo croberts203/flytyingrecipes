@@ -2,7 +2,7 @@
 // The app's own pages and scripts: network first (so fixes show up right away), saved copy when offline.
 // Icons and outside libraries (pinned versions): saved copy first.
 // Account data (Supabase) is never cached here.
-const CACHE = "flybench-v6"; // bump to clear old copies on every phone
+const CACHE = "flybench-v7"; // bump to clear old copies on every phone
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/privacy.html"];
 
 self.addEventListener("install", (e) => {

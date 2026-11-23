@@ -401,8 +401,19 @@ function benchItemFor(fm){
   const cat = fm.category && stocked.find(i => i.material.category === fm.category);
   return cat ? {i:cat, exact:false} : null;
 }
-function perFly(i){ let o={}; try{ o=JSON.parse(localStorage.getItem("fb_use")||"{}"); }catch{} return o[i.material_id] ?? USE_PER_FLY[i.material.category] ?? .05; }
-function savePerFly(id,v){ try{ const o=JSON.parse(localStorage.getItem("fb_use")||"{}"); o[id]=v; localStorage.setItem("fb_use",JSON.stringify(o)); }catch{} }
+// The tyer's own per-fly amount is saved on their bench item (inventory.use_per_fly), so it follows their account.
+// Older versions kept it on the device; those values are moved into the account the first time they're used.
+function perFly(i){
+  if(i.use_per_fly != null) return Number(i.use_per_fly);
+  let o={}; try{ o=JSON.parse(localStorage.getItem("fb_use")||"{}"); }catch{}
+  if(o[i.material_id] != null){ savePerFly(i, Number(o[i.material_id])); return Number(o[i.material_id]); }
+  return USE_PER_FLY[i.material.category] ?? .05;
+}
+async function savePerFly(i,v){
+  i.use_per_fly=v;
+  const { error } = await sb.from("inventory").update({ use_per_fly:v }).eq("id", i.id);
+  if(!error){ try{ const o=JSON.parse(localStorage.getItem("fb_use")||"{}"); if(i.material_id in o){ delete o[i.material_id]; localStorage.setItem("fb_use",JSON.stringify(o)); } }catch{} }
+}
 function useMaterials(f, count=1){
   if(!requireUser()) return;
   if(!S.inventory.length){ toast("Add materials to your bench first, then Fly Bench can keep count."); return; }
@@ -429,7 +440,7 @@ function useMaterials(f, count=1){
   $("#uNo",s).onclick=()=>s.remove();
   $("#uGo",s).onclick=async()=>{ const b=$("#uGo",s); b.disabled=true; b.textContent="Updating…";
     let low=0;
-    for(const r of rows){ if(r.changed) savePerFly(r.i.material_id, r.pf); if(!r.on) continue;
+    for(const r of rows){ if(r.changed) await savePerFly(r.i, r.pf); if(!r.on) continue;
       const q=Number(r.i.quantity), take=Math.min(q, +(r.pf*n).toFixed(3)); if(take<=0) continue;
       const nq=+(q-take).toFixed(3);
       const { error } = await sb.from("inventory").update({ quantity:nq }).eq("id", r.i.id);
@@ -923,6 +934,8 @@ function editInvItem(i){
     <p class="small muted" style="margin-top:-4px">Only you can see your bench photos.</p>
     <div class="row"><div class="grow"><label>Quantity</label><input type="number" min="0" step="0.5" id="q" value="${Number(i.quantity)}"></div>
     <div class="grow"><label>Warn when at or below</label><input type="number" min="0" step="0.5" id="lw" value="${Number(i.low_stock_at??1)}"></div></div>
+    <label>Used per fly tied</label><input type="number" min="0" max="100" step="${["hook","eyes"].includes(i.material.category)?1:0.01}" id="upf" value="${perFly(i)}">
+    <p class="small muted" style="margin:4px 0 0">${["hook","eyes"].includes(i.material.category)?"How many come off when you tie one fly.":"Share of one spool or pack that one fly uses (0.02 = about 50 flies). Taken off when you tap \u201cI tied this\u201d."}</p>
     <label>Where it's stored</label><input type="text" id="loc" value="${esc(i.storage_location||"")}" placeholder="Drawer 2, saltwater box…">
     <label>Notes</label><textarea id="nt">${esc(i.notes||"")}</textarea>
     ${mine?`<details style="margin-top:10px"><summary class="small">Edit material details (shared with everyone)</summary>
@@ -937,7 +950,8 @@ function editInvItem(i){
     const oldPhoto = i.photo_path;
     try{ if(photoFile) photo = await uploadPhoto("bench-photos", photoFile, 1200); }
     catch(err){ toast("Couldn't upload the photo: "+(err.message||err)); btn.disabled=false; btn.textContent="Save"; return; }
-    await sb.from("inventory").update({ quantity:newQ, low_stock_at:Number($("#lw",s).value)||0, storage_location:$("#loc",s).value.trim()||null, notes:$("#nt",s).value.trim()||null, photo_path:photo||null }).eq("id",i.id);
+    const upfIn=$("#upf",s).value, upf = upfIn==="" ? null : (i.use_per_fly==null && Number(upfIn)===perFly(i)) ? null : Math.max(0,Number(upfIn));
+    await sb.from("inventory").update({ quantity:newQ, use_per_fly:upf, low_stock_at:Number($("#lw",s).value)||0, storage_location:$("#loc",s).value.trim()||null, notes:$("#nt",s).value.trim()||null, photo_path:photo||null }).eq("id",i.id);
     if(oldPhoto && oldPhoto!==photo) sb.storage.from("bench-photos").remove([oldPhoto]);
     if(newQ!==Number(i.quantity)) await sb.from("inventory_events").insert({ material_id:i.material_id, delta:newQ-Number(i.quantity), source:"manual" });
     if(mine) await sb.from("materials").update({ name:$("#mn",s).value.trim()||m.name, brand:$("#mb",s).value.trim()||null, color:$("#mc",s).value.trim()||null, size:$("#ms",s).value.trim()||null, category:$("#mcat",s).value }).eq("id",m.id);
