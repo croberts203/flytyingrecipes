@@ -143,6 +143,8 @@ body:has(.sheet) #ft-btn, body:has(#scanner) #ft-btn{display:none!important} /* 
 @media(min-width:760px){.banner{margin:0 0 14px;border-radius:var(--r)}}
 .fishpick{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x proximity;padding:4px 2px 10px;margin:0 -14px;padding-left:14px;padding-right:14px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .fishpick::-webkit-scrollbar{display:none}
+.thumb.fishthumb{--fish-eye:var(--cream);color:var(--slate)}
+.thumb.fishthumb svg{width:52px;height:26px}
 .fishchip{flex:none;scroll-snap-align:start;width:78px;border:1px solid var(--line);background:var(--card);border-radius:16px;padding:8px 4px 7px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--slate);font:600 .74rem/1.15 var(--body);cursor:pointer;transition:transform .12s,background .15s;--fish-eye:var(--card)}
 .fishchip:active{transform:scale(.95)}
 .fishchip .fico{width:58px;height:29px;display:grid;place-items:center}
@@ -952,7 +954,7 @@ async function renderLog(){
   const body=$("#logBody");
   if(logView==="list"){
     body.innerHTML = S.catches.map(c=>{ const sp=speciesById(c.species_id); const fly=S.flies.find(f=>f.id===c.fly_id);
-      return `<div class="card flycard" data-c="${c.id}"><div class="thumb" style="${c.photo_url?`background-image:url('${c.photo_url}')`:""}">${c.photo_url?"":FISH_ICON}</div>
+      return `<div class="card flycard" data-c="${c.id}"><div class="thumb ${c.photo_url?"":"fishthumb"}" style="${c.photo_url?`background-image:url('${c.photo_url}')`:""}">${c.photo_url?"":(window.FBFish?FBFish.svg(sp?.common_name||c.species_other||""):FISH_ICON)}</div>
       <div class="grow"><h3>${esc(sp?.common_name || c.species_other || "Unknown species")}</h3><div class="small muted">${fmtDate(c.caught_at)}${c.location_name?` · ${esc(c.location_name)}`:""}</div>
       <div class="small">${c.length_in?`${c.length_in}" `:""}${fly?`on ${esc(fly.name)}`:""} ${c.kept?`<span class="tag">kept</span>`:`<span class="tag">released</span>`}</div></div></div>`; }).join("") || emptyNice(FISH_ICON, "No fish logged yet", "Log your first catch with a photo, the fly that caught it, and your state's fishing rules.", "emLog", "+ Log a fish");
     if($("#emLog")) $("#emLog").onclick=()=>editCatch();
