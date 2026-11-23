@@ -9,7 +9,7 @@ const SITE = "https://app.flytyingrecipes.org";
 const SUPABASE_URL = "https://rkxzfzzjzrnkiyopbdke.supabase.co";
 const SUPABASE_KEY = "sb_publishable_ypQ91HrykMCwgI59OCRFYg_MFGOgzi9";
 const FORECAST = "https://fishforecast.net";
-const FC_SP = {1:"redfish",2:"trout",3:"flounder",4:"blackdrum",5:"sheepshead",6:"pompano",7:"whiting",8:"snook",9:"tarpon",10:"cobia",11:"jack",13:"spanish",14:"bluefish",15:"bass",16:"bream",17:"redear",18:"bream",19:"crappie",20:"catfish"};
+const FC_SP = {1:"redfish",2:"trout",3:"flounder",4:"blackdrum",5:"sheepshead",6:"pompano",7:"whiting",8:"snook",9:"tarpon",10:"cobia",11:"jack",13:"spanish",14:"bluefish",15:"bass",16:"bream",17:"redear",18:"bream",19:"crappie",20:"catfish",21:"rainbow",22:"brown",23:"brook",25:"pike"};
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -20,7 +20,7 @@ async function getData() {
   if (process.argv[2]) return JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
   const h = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
   const q = async (p) => { const r = await fetch(`${SUPABASE_URL}/rest/v1/${p}`, { headers: h }); if (!r.ok) throw new Error(`${p}: ${r.status} ${await r.text()}`); return r.json(); };
-  const flies = await q("flies?is_public=eq.true&select=id,name,fly_type,water_type,hook_sizes,difficulty,description,fishing_tips,youtube_url,photo_url,photo_credit,photo_source_url,photo_license_url,creator_name,creator_url,updated_at,cover_photo_path,is_starter,author_id,fly_materials(part,material_text,sort),fly_steps(step_no,instruction,youtube_url,photo_path),fly_species(species_id)&order=id");
+  const flies = await q("flies?is_public=eq.true&select=id,name,fly_type,water_type,hook_sizes,difficulty,description,fishing_tips,imitates,hatch,youtube_url,photo_url,photo_credit,photo_source_url,photo_license_url,creator_name,creator_url,updated_at,cover_photo_path,is_starter,author_id,fly_materials(part,material_text,sort),fly_steps(step_no,instruction,youtube_url,photo_path),fly_species(species_id)&order=id");
   const species = await q("species?select=id,common_name,scientific_name,water_type,group_name,sort_order&order=sort_order");
   return { flies, species };
 }
@@ -112,6 +112,7 @@ for (const f of flies) {
 ${p ? `<img class="hero" src="${esc(p.url)}" alt="${esc(f.name)} fly" width="1200" height="675"><p class="credit">${p.credit}</p>` : ""}
 ${sp.length ? `<div class="tags">${sp.map(s => `<a class="tag" href="/fish/${s.slug}/">${esc(short(s.common_name))}</a>`).join("")}</div>` : ""}
 ${f.description ? `<p>${esc(f.description)}</p>` : ""}${yt}
+${f.imitates || f.hatch ? `<div class="card"><h2>Hatch &amp; entomology</h2>${f.imitates ? `<p style="margin:0 0 6px"><b>Imitates:</b> ${esc(f.imitates)}</p>` : ""}${f.hatch ? `<p style="margin:0"><b>When:</b> ${esc(f.hatch)}</p>` : ""}</div>` : ""}
 ${f.fishing_tips ? `<div class="card"><h2>How to fish it</h2><p style="margin:0">${esc(f.fishing_tips)}</p></div>` : ""}
 <div class="card"><h2>Materials</h2><ul class="mats">${mats.map(m => `<li>${m.part ? `<b>${esc(m.part)}:</b> ` : ""}${esc(m.material_text)}</li>`).join("")}</ul></div>
 <div class="card"><h2>Step by step</h2><ol class="steps">${steps.map(s => `<li id="step-${s.step_no}">${esc(s.instruction)}${s.photo_path ? `<img src="${esc(storage(s.photo_path))}" alt="Step ${s.step_no}" loading="lazy">` : ""}${s.youtube_url ? ` <a href="${esc(s.youtube_url)}" rel="noopener">▶ Watch this step</a>` : ""}</li>`).join("")}</ol></div>

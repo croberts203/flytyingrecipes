@@ -53,6 +53,8 @@
     redbreast: { d: 11, h: .9, t: "round", f: "long", m: function () { return '<path d="M13,13.5 L19,14 L13,16.5 Z" fill="var(--fish-eye,#fff)"/>' + eye(9.5, 13); } },
     crappie:   { d: 11, h: .7, t: "round", f: "long", m: function () { return dot(22, 12, 1.2) + dot(30, 14, 1.4) + dot(25, 19, 1.1) + dot(37, 18, 1.2) + dot(34, 11, 1) + eye(9.5, 13.5); } },
     catfish:   { d: 6.5, h: 1, b: .9, t: "fork", f: "sail", m: function () { return '<path d="M5,16 C1,20 0,23 -1,26 M5,15 C2,13 0,12 -2,11 M6,17 C4,21 4,24 4,27" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>' + dot(28, 14, .8) + dot(34, 17, .8) + eye(9.5, 13.5); } },
+    trout:     { d: 6.5, h: .45, t: "square", f: "two", m: function () { return dot(20, 12, .9) + dot(27, 11, .9) + dot(34, 12, .9) + dot(41, 13, .8) + dot(24, 15, .8) + dot(31, 14.5, .8) + eye(9.5, 14); } },
+    pike:      { d: 4.6, h: .1, t: "fork", f: "long", m: function () { return dot(20, 14, .9) + dot(27, 15, .9) + dot(34, 14, .9) + dot(23, 17.5, .8) + dot(30, 18, .8) + eye(8, 14.5); } },
     generic:   { d: 7.5, h: .5, t: "fork", f: "two", m: function () { return eye(10, 14); } }
   };
   var MATCH = [
@@ -61,7 +63,7 @@
     [/whiting|kingfish/i, "whiting"], [/snook/i, "snook"], [/tarpon/i, "tarpon"], [/cobia/i, "cobia"],
     [/jack|crevalle|trevally/i, "jack"], [/lady ?fish/i, "ladyfish"], [/mackerel|bonito|tuna/i, "mackerel"],
     [/bluefish/i, "bluefish"], [/bass/i, "bass"], [/redbreast/i, "redbreast"], [/crappie|speckled perch/i, "crappie"],
-    [/bluegill|sunfish|shellcracker|bream/i, "sunfish"], [/cat ?fish/i, "catfish"], [/drum/i, "drum"]
+    [/bluegill|sunfish|shellcracker|bream/i, "sunfish"], [/cat ?fish/i, "catfish"], [/trout|salmon|char\b|steelhead|grayling/i, "trout"], [/pike|pickerel|musk(y|ie|ellunge)/i, "pike"], [/drum/i, "drum"]
   ];
   function key(name) { for (var i = 0; i < MATCH.length; i++) if (MATCH[i][0].test(name || "")) return MATCH[i][1]; return "generic"; }
   function svg(name) {

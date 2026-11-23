@@ -299,7 +299,7 @@ const uid = () => crypto.randomUUID();
 const spSlug = n => String(n||"").replace(/ \(.+\)/,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
 // Fly Bench species id -> Fish Bite Forecast species id
 const FORECAST = "https://fishforecast.net";
-const FC_SP = {1:"redfish",2:"trout",3:"flounder",4:"blackdrum",5:"sheepshead",6:"pompano",7:"whiting",8:"snook",9:"tarpon",10:"cobia",11:"jack",13:"spanish",14:"bluefish",15:"bass",16:"bream",17:"redear",18:"bream",19:"crappie",20:"catfish"};
+const FC_SP = {1:"redfish",2:"trout",3:"flounder",4:"blackdrum",5:"sheepshead",6:"pompano",7:"whiting",8:"snook",9:"tarpon",10:"cobia",11:"jack",13:"spanish",14:"bluefish",15:"bass",16:"bream",17:"redear",18:"bream",19:"crappie",20:"catfish",21:"rainbow",22:"brown",23:"brook",25:"pike"};
 const forecastLink = sp => sp && FC_SP[sp.id] ? `<a class="fclink" href="${FORECAST}/#bite=${FC_SP[sp.id]}" target="_blank" rel="noopener"><span class="fcico">${window.FBFish?FBFish.svg(sp.common_name):""}</span><span><b>Are ${esc(sp.common_name.replace(/ \(.+\)/,""))} biting?</b><br><span class="small">Tides, weather and best times near you on Fish Bite Forecast</span></span><span class="fcgo">›</span></a>` : "";
 const fmtDate = d => new Date(d).toLocaleString([], {month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit"});
 function requireUser(){ if(!S.user){ openAuth(); return false; } return true; }
@@ -611,6 +611,7 @@ function openFly(id){
     ${creatorBlock(f)}
     ${f.description?`<p>${esc(f.description)}</p>`:""}
     ${steps.length||S.user?`<div class="row" style="gap:8px;margin:12px 0 4px">${steps.length?`<button class="btn grow" id="tieF">▶ Start tying, step by step</button>`:""}${S.user?`<button class="btn alt${steps.length?"":" grow"}" id="tiedF">✓ I tied this</button>`:""}</div>`:""}
+    ${f.imitates||f.hatch?`<div class="card hatchcard"><h3>Hatch &amp; entomology</h3>${f.imitates?`<p class="small" style="margin:6px 0 0"><b>Imitates:</b> ${esc(f.imitates)}</p>`:""}${f.hatch?`<p class="small" style="margin:6px 0 0"><b>When:</b> ${esc(f.hatch)}</p>`:""}</div>`:""}
     ${f.fishing_tips?`<div class="card"><h3>How to fish it</h3><p class="small" style="margin:6px 0 0">${esc(f.fishing_tips)}</p></div>`:""}
     <div class="card"><div class="row"><h3 class="grow">Materials</h3>${S.user?`<span class="small muted">vs. your bench</span>`:""}</div>
       <ul style="list-style:none;padding:0;margin:8px 0 0">${mats.map(m=>{ const st=matStatus(m); const ph=catPhotoUrl(m.category,96); return `<li style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px"><span class="matthumb sm">${ph?`<img src="${ph}" alt="" loading="lazy">`:FLY_ICON}</span><span>${st?`<span class="dot ${st}"></span>`:""}<b>${esc(m.part||"")}</b>${m.part?": ":""}${esc(m.material_text)}</span>${st!=="have"?`<span style="margin-left:auto">${buyLink({ label:m.material_text, material_id:m.material_id||null, category:m.category||"other" })}</span>`:""}</li>`; }).join("")}</ul><p class="small muted" style="margin:6px 0 0">Material pictures show the type of material. <a href="#" class="matCred">Photo credits</a></p>
@@ -722,6 +723,8 @@ function editFly(f=null){
     <label>Target species</label><div class="chips wrap" id="eSp" style="flex-wrap:wrap">${S.species.map(sp=>`<span class="chip ${spSel.has(sp.id)?"on":""}" data-sp="${sp.id}">${esc(sp.common_name.replace(/ \(.+\)/,""))}</span>`).join("")}</div>
     <label>Description</label><textarea id="eDesc">${esc(f.description||"")}</textarea>
     <label>How to fish it</label><textarea id="eTips">${esc(f.fishing_tips||"")}</textarea>
+    <label>What it imitates (optional)</label><input id="eImit" maxlength="300" value="${esc(f.imitates||"")}" placeholder="e.g. Olive mayfly nymph">
+    <label>When it hatches (optional)</label><input id="eHatch" maxlength="300" value="${esc(f.hatch||"")}" placeholder="e.g. April–June, midday">
     <div class="row" style="margin-top:14px"><h3 class="grow">Materials <span class="req">*</span></h3><button class="btn sm alt" id="addMat">+ Material</button></div>
     <div id="eMats"></div>
     <div class="row" style="margin-top:14px"><h3 class="grow">Step-by-step instructions <span class="req">*</span></h3><button class="btn sm alt" id="addStep">+ Step</button></div>
@@ -780,7 +783,7 @@ function editFly(f=null){
       if(!cover){ const firstPhoto = steps.find(x=>x.photo_path); if(firstPhoto) cover = firstPhoto.photo_path; }
       busy("Saving recipe…");
       const row = { name, fly_type:$("#eType",s).value.trim(), water_type:$("#eWater",s).value, hook_sizes:$("#eHooks",s).value.trim(),
-        difficulty:$("#eDiff",s).value, description:$("#eDesc",s).value.trim(), fishing_tips:$("#eTips",s).value.trim(),
+        difficulty:$("#eDiff",s).value, description:$("#eDesc",s).value.trim(), fishing_tips:$("#eTips",s).value.trim(), imitates:$("#eImit",s).value.trim()||null, hatch:$("#eHatch",s).value.trim()||null,
         tutorial_links: $("#eLinks",s).value.split(/\s+/).filter(u=>/^https?:\/\//.test(u)).map(url=>({label:url.replace(/^https?:\/\/(www\.)?/,"").split("/")[0], url})),
         is_public:$("#ePub",s).checked, cover_photo_path:cover, youtube_url:yt?ytCanon(yt):null,
         creator_name:$("#eCred",s).value.trim()||null, creator_url:credUrl||null };
