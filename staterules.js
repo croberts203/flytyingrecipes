@@ -60,10 +60,13 @@
   function locate() { return position().then(function (p) { return lookup(p.lat, p.lng).then(function (r) { p.region = r; return p; }); }); }
 
   /* The links for a region: [{label, url, primary}] */
-  var WARN_ONLY = { "US-AZ": "Arizona Game and Fish Department", "US-NE": "Nebraska Game and Parks Commission" };
+  /* Links we couldn't confirm from here (their sites block automated checks): shown with a warning */
+  var UNCHECKED = { "US-AZ": { agency: "Arizona Game and Fish Department", url: "https://www.azgfd.com/" },
+                    "US-NE": { agency: "Nebraska Game and Parks Commission", url: "https://outdoornebraska.gov/" } };
   function links(r) {
     if (!r || !r.region_name) return [{ label: "State fishing websites (NOAA)", url: NOAA, primary: true }];
-    if (WARN_ONLY[r.region_code]) return [];
+    var u = UNCHECKED[r.region_code];
+    if (u) return [{ label: u.agency, url: u.url, primary: true }];
     var isUS = (r.country_code || "").toUpperCase() === "US", out = [];
     if (r.region_code === "US-FL") {
       out.push({ label: "FWC saltwater rules", url: "https://myfwc.com/fishing/saltwater/recreational/", primary: true });
@@ -77,7 +80,7 @@
   /* A caution when there is no checked official link for the place (Arizona, Nebraska, outside the US…) */
   function warning(r) {
     if (!r || !r.region_name) return "";
-    if (WARN_ONLY[r.region_code]) return "We can't link " + r.region_name + "'s fishing rules right now. Check the " + WARN_ONLY[r.region_code] + " for current rules before you keep a fish.";
+    if (UNCHECKED[r.region_code]) return "We couldn't confirm this link. If it doesn't open, search for the " + UNCHECKED[r.region_code].agency + ", and check you're on the official site before you rely on any rules.";
     if (r.region_code === "US-FL" || SITES[r.region_code]) return "";
     return "We don't have a checked official link for " + r.region_name + " yet. Use the search, and make sure the page you land on belongs to the official state or government fishing agency before you rely on it.";
   }
