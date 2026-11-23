@@ -3,67 +3,71 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#123b3a">
+<meta name="theme-color" content="#182241">
 <title>Fly Bench · Fly Tying Recipes</title>
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 :root{
-  --ink:#16231f; --muted:#5d6b66; --paper:#f6f2e9; --card:#fffdf8; --line:#e2dccd;
-  --teal:#123b3a; --teal2:#1f5c59; --brass:#b9852f; --red:#b4452f; --green:#2f7a4a; --amber:#b9852f;
-  --r:14px; --shadow:0 1px 2px rgba(0,0,0,.05),0 4px 14px rgba(18,59,58,.06);
+  /* matches flytyingrecipes.org: navy, slate, sea and cream */
+  --navy:#182241; --slate:#536c7c; --sea:#7b949c; --cream:#fff5d9;
+  --ink:#182241; --muted:#5b6b78; --paper:#f7f3e8; --card:#ffffff; --line:#e3ddcc;
+  --teal:#182241; --teal2:#536c7c; --brass:#c9a24a; --red:#b4452f; --green:#2f7a4a; --amber:#b9852f;
+  --r:18px; --shadow:0 1px 2px rgba(24,34,65,.05),0 6px 18px rgba(24,34,65,.07);
+  --head:Manrope,system-ui,sans-serif; --body:"Nunito Sans",system-ui,sans-serif;
 }
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 Inter,system-ui,sans-serif;-webkit-text-size-adjust:100%}
-h1,h2,h3{font-family:Fraunces,Georgia,serif;font-weight:700;margin:0;letter-spacing:-.01em}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:15.5px/1.5 var(--body);-webkit-text-size-adjust:100%}
+h1,h2,h3{font-family:var(--head);font-weight:700;margin:0;letter-spacing:-.015em;color:var(--navy)}
 h1{font-size:1.5rem} h2{font-size:1.25rem} h3{font-size:1.05rem}
 a{color:var(--teal2)}
 button,input,select,textarea{font:inherit;color:inherit}
-header.top{position:sticky;top:0;z-index:20;background:var(--teal);color:#fff;padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;display:flex;align-items:center;gap:10px}
-header.top h1{font-size:1.25rem;flex:1}
-header.top .sub{font:500 .75rem Inter;opacity:.7;letter-spacing:.08em;text-transform:uppercase}
-header.top button{background:rgba(255,255,255,.12);border:0;color:#fff;border-radius:999px;padding:6px 12px;font-size:.85rem}
-main{padding:14px 14px calc(90px + env(safe-area-inset-bottom));max-width:760px;margin:0 auto}
+header.top{position:sticky;top:0;z-index:20;background:var(--navy);color:var(--cream);padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;display:flex;align-items:center;gap:10px}
+header.top h1{font-size:1.3rem;flex:1;color:var(--cream);font-weight:800}
+header.top .sub{font:700 .7rem var(--body);opacity:.75;letter-spacing:.08em;text-transform:uppercase}
+header.top button{background:var(--cream);border:0;color:var(--slate);border-radius:999px;padding:7px 14px;font-size:.85rem;font-weight:700}
+main{padding:14px 14px calc(150px + env(safe-area-inset-bottom));max-width:760px;margin:0 auto}
 nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:30;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom)}
 nav.tabs button{flex:1;background:none;border:0;padding:9px 0 8px;font-size:.72rem;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px}
 nav.tabs button svg{width:22px;height:22px}
-nav.tabs button.on{color:var(--teal)}
-nav.tabs button.on svg{stroke:var(--brass)}
+nav.tabs button.on{color:var(--navy);font-weight:700}
+nav.tabs button.on svg{stroke:var(--slate)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:14px;margin-bottom:12px}
 .row{display:flex;gap:8px;align-items:center}
 .wrap{flex-wrap:wrap}
 .grow{flex:1;min-width:0}
 .muted{color:var(--muted)} .small{font-size:.82rem}
-.btn{border:0;border-radius:10px;padding:10px 14px;background:var(--teal);color:#fff;font-weight:600;cursor:pointer}
-.btn.alt{background:#e9e3d4;color:var(--ink)}
-.btn.brass{background:var(--brass)}
+.btn{border:0;border-radius:999px;padding:11px 18px;background:var(--slate);color:#fff;font-weight:700;cursor:pointer;letter-spacing:.01em}
+.btn.alt{background:var(--cream);color:var(--slate)}
+.btn.brass{background:var(--navy);color:var(--cream)}
 .btn.ghost{background:none;color:var(--teal2);padding:6px 8px}
 .btn.danger{background:var(--red)}
-.btn.sm{padding:6px 10px;font-size:.85rem;border-radius:8px}
+.btn.sm{padding:6px 12px;font-size:.85rem;border-radius:999px}
 .btn:disabled{opacity:.5}
 .fab{position:fixed;right:16px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:25;border-radius:999px;padding:14px 18px;box-shadow:0 6px 18px rgba(0,0,0,.2)}
-input[type=text],input[type=email],input[type=password],input[type=number],input[type=search],input[type=datetime-local],select,textarea{width:100%;border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 12px}
+input[type=text],input[type=email],input[type=password],input[type=number],input[type=search],input[type=datetime-local],select,textarea{width:100%;border:1px solid var(--line);background:#fff;border-radius:12px;padding:11px 14px}
+input[type=search]{border-radius:999px;padding-left:18px}
 textarea{min-height:80px;resize:vertical}
 label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin:10px 0 4px}
 .chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
 .chip{flex:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font-size:.85rem;white-space:nowrap;cursor:pointer}
-.chip.on{background:var(--teal);border-color:var(--teal);color:#fff}
-.tag{display:inline-block;font-size:.72rem;background:#eee7d6;border-radius:6px;padding:2px 7px;margin:2px 4px 2px 0}
-.tag.salt{background:#dbe9ea} .tag.fresh{background:#e3ecd9}
+.chip.on{background:var(--navy);border-color:var(--navy);color:var(--cream);font-weight:700}
+.tag{display:inline-block;font-size:.74rem;font-weight:600;background:var(--cream);color:var(--slate);border-radius:999px;padding:2px 9px;margin:2px 4px 2px 0}
+.tag.salt{background:#dde7ea;color:#3d5563} .tag.fresh{background:#e3ecd9;color:#3f5a37} .tag.both{background:#e7e4f0;color:#4a4a6a}
 .flycard{display:flex;gap:12px;align-items:center;cursor:pointer}
-.thumb{width:64px;height:64px;border-radius:10px;background:#e9e3d4 center/cover no-repeat;flex:none;display:grid;place-items:center;color:var(--brass)}
+.thumb{width:64px;height:64px;border-radius:12px;background:var(--cream) center/cover no-repeat;flex:none;display:grid;place-items:center;color:var(--slate)}
 .thumb svg{width:30px;height:30px}
 .have{color:var(--green)} .maybe{color:var(--amber)} .need{color:var(--red)}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
 .dot.have{background:var(--green)} .dot.maybe{background:var(--amber)} .dot.need{background:var(--red)}
 ol.steps{padding-left:0;list-style:none;counter-reset:s;margin:0}
 ol.steps li{counter-increment:s;position:relative;padding:0 0 14px 40px}
-ol.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:var(--teal);color:#fff;font:600 .85rem/28px Inter;text-align:center}
+ol.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:var(--slate);color:#fff;font:700 .85rem/28px var(--body);text-align:center}
 ol.steps img{width:100%;border-radius:10px;margin-top:8px}
 .hero{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:var(--r);margin-bottom:12px;background:#e9e3d4}
 .qty{display:flex;align-items:center;gap:6px}
@@ -89,8 +93,8 @@ ol.steps img{width:100%;border-radius:10px;margin-top:8px}
 .reg dd{margin:2px 0 0}
 .ai{border-left:4px solid var(--brass)}
 .empty{text-align:center;padding:30px 10px;color:var(--muted)}
-.seg{display:flex;background:#e9e3d4;border-radius:10px;padding:3px;margin-bottom:12px}
-.seg button{flex:1;border:0;background:none;padding:7px;border-radius:8px;font-weight:600;font-size:.88rem;color:var(--muted)}
+.seg{display:flex;background:#ece6d6;border-radius:999px;padding:3px;margin-bottom:12px}
+.seg button{flex:1;border:0;background:none;padding:7px;border-radius:999px;font-weight:600;font-size:.88rem;color:var(--muted)}
 .seg button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
 .edit-row{border:1px dashed var(--line);border-radius:10px;padding:10px;margin-bottom:8px;background:#fff}
 .photo-pick{display:flex;align-items:center;gap:10px}
@@ -103,7 +107,7 @@ ol.steps img{width:100%;border-radius:10px;margin-top:8px}
 .yt-prev{display:flex;align-items:center;gap:10px;margin-top:6px}
 .yt-prev img{width:96px;aspect-ratio:16/9;object-fit:cover;border-radius:6px}
 .hero.fit{object-fit:contain;background:#141a1c}
-.matthumb{width:48px;height:48px;flex:none;border-radius:8px;overflow:hidden;background:#e9e3d4;display:grid;place-items:center;color:var(--brass,#b8862b)}
+.matthumb{width:48px;height:48px;flex:none;border-radius:8px;overflow:hidden;background:#e9e3d4;display:grid;place-items:center;color:var(--slate)}
 .matthumb{position:relative}
 .matthumb img{width:100%;height:100%;object-fit:cover}
 .matthumb .addph{position:absolute;right:-2px;bottom:-2px;font-size:12px;background:#fff;border-radius:50%;width:18px;height:18px;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.25)}
@@ -114,17 +118,40 @@ ol.steps img{width:100%;border-radius:10px;margin-top:8px}
 .matthumb.sm svg{width:18px;height:18px}
 .credit{margin:-6px 0 10px}
 .credit a{color:inherit}
-.media-tag{position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.65);color:#fff;font:600 .7rem/1 Inter;padding:3px 5px;border-radius:5px}
+.media-tag{position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.65);color:#fff;font:700 .7rem/1 var(--body);padding:4px 7px;border-radius:999px}
 .thumb{position:relative}
 .req{color:#b3412e}
 .spinner{display:inline-block;width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-3px}
 @keyframes spin{to{transform:rotate(360deg)}}
 .hide{display:none!important}
 .hero-link{position:relative;display:block}.hero-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:3rem;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.6);pointer-events:none}
-.card.credit{border-left:4px solid #b5832f}
-.card.rules{border-left:4px solid #b5832f}
+.card.credit{border-left:4px solid var(--sea)}
+.card.rules{border-left:4px solid var(--sea)}
 body:has(.sheet) #ft-btn, body:has(#scanner) #ft-btn{display:none!important} /* keep the chat bubble off open forms */.card.rules .row a.btn{text-decoration:none}
 .card.credit a.btn{display:block;color:#fff;text-decoration:none}
+
+/* Flies tab banner, bigger recipe cards, friendlier empty states */
+.banner{position:relative;margin:-14px -14px 14px;min-height:170px;padding:22px 20px 20px;display:flex;flex-direction:column;justify-content:flex-end;color:var(--cream);background:var(--navy) url('https://images.squarespace-cdn.com/content/v1/6b010ce7d7a3185c477334d7/1795232922906-OFSVWV5SDN5JWU0NTN5A/unsplash-image-0Rl_Rxh6Jq8.jpg?format=1000w') center/cover no-repeat}
+.banner::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(24,34,65,.15),rgba(24,34,65,.82))}
+.banner>*{position:relative}
+.banner h2{color:var(--cream);font-size:1.45rem;font-weight:800;line-height:1.2}
+.banner p{margin:4px 0 0;font-size:.95rem;opacity:.92}
+.banner .btn{align-self:flex-start;margin-top:12px;background:var(--cream);color:var(--slate)}
+@media(min-width:760px){.banner{margin:0 0 14px;border-radius:var(--r)}}
+.flycard.big{display:block;padding:0;overflow:hidden}
+.flycard.big .pic{position:relative;aspect-ratio:16/9;background:var(--cream) center/cover no-repeat;display:grid;place-items:center;color:var(--sea)}
+.flycard.big .pic svg{width:54px;height:54px}
+.flycard.big .pic.noimg{aspect-ratio:auto;height:110px}
+.flycard.big .pic .media-tag{right:10px;bottom:10px;font-size:.75rem}
+.flycard.big .pic .cantie{position:absolute;left:10px;top:10px;background:var(--green);color:#fff;font:700 .74rem/1 var(--body);padding:5px 9px;border-radius:999px}
+.flycard.big .body{padding:12px 16px 14px}
+.flycard.big h3{font-size:1.15rem}
+.flycard.big .by{font-size:.85rem;color:var(--slate);font-weight:600}
+.empty.nice{background:var(--card);border:1px dashed #d6cfbb;border-radius:var(--r);padding:28px 20px}
+.empty.nice .ico{width:56px;height:56px;margin:0 auto 10px;border-radius:50%;background:var(--cream);display:grid;place-items:center;color:var(--slate)}
+.empty.nice .ico svg{width:28px;height:28px}
+.empty.nice h3{margin-bottom:4px}
+.empty.nice p{margin:0 0 12px}
 </style>
 </head>
 <body>
@@ -169,6 +196,8 @@ function showPhotoCredits(){
     ${Object.entries(CAT_PHOTO).map(([c,[f,a,l,u]])=>`<div class="row" style="gap:10px;margin:8px 0"><img src="${catPhotoUrl(c,120)}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px"><div class="small"><b>${esc(CAT_LABEL[c])}</b><br><a href="https://commons.wikimedia.org/wiki/File:${encodeURIComponent(f)}" target="_blank" rel="noopener">${esc(a)}</a>, ${u?`<a href="${u}" target="_blank" rel="noopener">${esc(l)}</a>`:esc(l)}</div></div>`).join("")}`);
 }
 const FLY_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 20c6-1 10-5 12-12"/><path d="M16 8c2-1 3-3 4-5-2 1-4 2-5 4"/><path d="M8 16c-2-2-3-5-2-9 3 1 5 3 6 6"/></svg>`;
+const emptyNice = (icon, title, text, btnId, btnLabel) => `<div class="empty nice"><div class="ico">${icon}</div><h3>${title}</h3><p>${text}</p>${btnId?`<button class="btn" id="${btnId}">${btnLabel}</button>`:""}</div>`;
+const BENCH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v6M15 4v6"/></svg>`;
 const FISH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 12c3-4 7-6 11-6 4 0 7 3 9 6-2 3-5 6-9 6-4 0-8-2-11-6z"/><circle cx="16" cy="11" r="1"/></svg>`;
 
 /* ---------------- state ---------------- */
@@ -401,7 +430,8 @@ async function renderFlies(){
     if(F.mine && f.author_id !== S.user?.id) return false;
     return true;
   });
-  view.innerHTML = `
+  const banner = `<div class="banner"><h2>${S.user?"What are you tying today?":"Tie it. Fish it. Log it."}</h2><p>${S.user?"Recipes sorted by the fish you're after, matched to the materials on your bench.":"Free fly recipes sorted by species. Sign in to track your materials and see what you can tie right now."}</p>${S.user?"":`<button class="btn sm" id="bnSign">Sign in free</button>`}</div>`;
+  view.innerHTML = banner + `
     <input type="search" id="fq" placeholder="Search flies…" value="${esc(F.q)}">
     <div style="height:8px"></div>
     <select id="fsp"><option value="">All species</option>${spOpts}</select>
@@ -412,7 +442,9 @@ async function renderFlies(){
       ${S.user?`<span class="chip ${F.canTie?"on":""}" id="fcan">Can tie now</span><span class="chip ${F.mine?"on":""}" id="fmine">My recipes</span>`:""}
     </div>
     <p class="small muted">${list.length} ${list.length===1?"fly":"flies"}</p>
-    <div id="flist">${list.map(flyCard).join("") || `<div class="empty">No flies match. Try clearing a filter.</div>`}</div>`;
+    <div id="flist">${list.map(flyCard).join("") || emptyNice(FLY_ICON, "No flies match", "Try a different search, or clear the filters to see every recipe.", "fClear", "Clear filters")}</div>`;
+  if($("#bnSign")) $("#bnSign").onclick=openAuth;
+  if($("#fClear")) $("#fClear").onclick=()=>{ Object.assign(F,{q:"",species:"",water:"",canTie:false,mine:false}); renderFlies(); };
   $("#fq").oninput = e => { F.q=e.target.value; clearTimeout(renderFlies.t); renderFlies.t=setTimeout(()=>{ renderFlies().then(()=>{ const i=$("#fq"); i.focus(); i.setSelectionRange(i.value.length,i.value.length); }); }, 250); };
   $("#fsp").onchange = e => { F.species=e.target.value; renderFlies(); };
   view.querySelectorAll("[data-w]").forEach(c=>c.onclick=()=>{ F.water=c.dataset.w; renderFlies(); });
@@ -425,12 +457,12 @@ function flyCard(f){
   const sp = (f.fly_species||[]).map(x=>speciesById(x.species_id)?.common_name).filter(Boolean);
   const img = flyThumb(f);
   const tie = S.user && S.inventory.length ? (canTie(f) ? `<span class="small have">● Can tie</span>` : "") : "";
-  return `<div class="card flycard" data-fly="${f.id}">
-    <div class="thumb" style="${img?`background-image:url('${img}')`:""}">${img?"":FLY_ICON}${f.youtube_url||(f.fly_steps||[]).some(x=>x.youtube_url)?`<span class="media-tag">▶ Video</span>`:""}</div>
-    <div class="grow">
+  return `<div class="card flycard big" data-fly="${f.id}">
+    <div class="pic${img?"":" noimg"}" style="${img?`background-image:url('${img}')`:""}">${img?"":FLY_ICON}${f.youtube_url||(f.fly_steps||[]).some(x=>x.youtube_url)?`<span class="media-tag">▶ Video</span>`:""}${tie?`<span class="cantie">✓ You can tie this</span>`:""}</div>
+    <div class="body">
       <h3>${esc(f.name)}</h3>
-      ${f.creator_name?`<div class="small" style="color:var(--accent,#1f4d3a)">by ${esc(f.creator_name)}</div>`:""}
-      <div class="small muted">${esc(f.fly_type||"")}${f.hook_sizes?` · ${esc(f.hook_sizes.split(";")[0])}`:""} ${tie}</div>
+      ${f.creator_name?`<div class="by">by ${esc(f.creator_name)}</div>`:""}
+      ${f.fly_type||f.hook_sizes?`<div class="small muted">${esc(f.fly_type||"")}${f.fly_type&&f.hook_sizes?" · ":""}${f.hook_sizes?esc(f.hook_sizes.split(";")[0]):""}</div>`:""}
       <div>${f.water_type?`<span class="tag ${f.water_type}">${f.water_type==="both"?"salt + fresh":f.water_type}</span>`:""}${sp.slice(0,3).map(n=>`<span class="tag">${esc(n.replace(/ \(.+\)/,""))}</span>`).join("")}${sp.length>3?`<span class="tag">+${sp.length-3}</span>`:""}</div>
     </div></div>`;
 }
@@ -596,7 +628,7 @@ async function renderInventory(){
     <input type="search" id="iq" placeholder="Search your materials…" value="${esc(invQ)}">
     <div class="chips" style="margin-top:8px"><span class="chip ${!invLowOnly?"on":""}" id="allI">All (${S.inventory.length})</span><span class="chip ${invLowOnly?"on":""}" id="lowI">Low / out (${low.length})</span>${low.length?`<span class="chip" id="copyLow">Copy shopping list</span>`:""}</div>
     ${Object.keys(groups).length ? CATEGORIES.filter(c=>groups[c]).map(c=>`<h3 style="margin:14px 0 8px">${CAT_LABEL[c]}</h3>${groups[c].map(invRow).join("")}`).join("") :
-      `<div class="empty">${S.inventory.length?"Nothing matches.":"No materials yet. Scan a barcode or tap + Add material."}</div>`}
+      (S.inventory.length ? emptyNice(BENCH_ICON, "Nothing matches", "Try a different search or show all materials.") : emptyNice(BENCH_ICON, "Your bench is empty", "Scan the barcode on a material package, or add one by name. Then Fly Bench can show which flies you can tie.", "emScan", "📷 Scan your first material"))}
     <p class="small muted" style="margin-top:16px">Pictures show the type of material, not your exact product. <a href="#" id="matCred">Photo credits</a></p>`;
   $("#matCred").onclick=e=>{ e.preventDefault(); showPhotoCredits(); };
   $("#iq").oninput=e=>{ invQ=e.target.value; clearTimeout(renderInventory.t); renderInventory.t=setTimeout(()=>renderInventory().then(()=>{const i=$("#iq"); i.focus(); i.setSelectionRange(i.value.length,i.value.length);}),300); };
@@ -605,6 +637,7 @@ async function renderInventory(){
   if($("#copyLow")) $("#copyLow").onclick=async()=>{ const txt="Fly tying shopping list:\n"+low.map(i=>`• ${matLabel(i.material)}`).join("\n"); try{ await navigator.clipboard.writeText(txt); toast("Copied"); }catch{ sheet(`<textarea style="min-height:200px">${esc(txt)}</textarea>`); } };
   wireBuyLinks(view); if($("#pendC")) $("#pendC").onclick=()=>askPurchases();
   $("#scanBtn").onclick=()=>openScanner();
+  if($("#emScan")) $("#emScan").onclick=()=>openScanner();
   $("#rcptBtn").onclick=()=>openReceipt();
   view.querySelectorAll("[data-inc]").forEach(b=>b.onclick=async e=>{ e.stopPropagation(); await adjust(+b.dataset.mat, +b.dataset.inc, "manual"); renderInventory(); });
   view.querySelectorAll("[data-inv]").forEach(r=>r.onclick=()=>editInvItem(S.inventory.find(i=>i.id===+r.dataset.inv)));
@@ -883,7 +916,8 @@ async function renderLog(){
     body.innerHTML = S.catches.map(c=>{ const sp=speciesById(c.species_id); const fly=S.flies.find(f=>f.id===c.fly_id);
       return `<div class="card flycard" data-c="${c.id}"><div class="thumb" style="${c.photo_url?`background-image:url('${c.photo_url}')`:""}">${c.photo_url?"":FISH_ICON}</div>
       <div class="grow"><h3>${esc(sp?.common_name || c.species_other || "Unknown species")}</h3><div class="small muted">${fmtDate(c.caught_at)}${c.location_name?` · ${esc(c.location_name)}`:""}</div>
-      <div class="small">${c.length_in?`${c.length_in}" `:""}${fly?`on ${esc(fly.name)}`:""} ${c.kept?`<span class="tag">kept</span>`:`<span class="tag">released</span>`}</div></div></div>`; }).join("") || `<div class="empty">No fish logged yet. Tap “+ Log a fish”.</div>`;
+      <div class="small">${c.length_in?`${c.length_in}" `:""}${fly?`on ${esc(fly.name)}`:""} ${c.kept?`<span class="tag">kept</span>`:`<span class="tag">released</span>`}</div></div></div>`; }).join("") || emptyNice(FISH_ICON, "No fish logged yet", "Log your first catch with a photo, the fly that caught it, and your state's fishing rules.", "emLog", "+ Log a fish");
+    if($("#emLog")) $("#emLog").onclick=()=>editCatch();
     body.querySelectorAll("[data-c]").forEach(el=>el.onclick=()=>openCatch(S.catches.find(c=>c.id===+el.dataset.c)));
   } else if(logView==="map"){
     body.innerHTML=`<div id="map"></div><p class="small muted">Only you can see your catch locations.</p>`;
@@ -892,12 +926,12 @@ async function renderLog(){
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom:19, attribution:"© OpenStreetMap" }).addTo(map);
     const pts=[];
     S.catches.filter(c=>c.lat&&c.lng).forEach(c=>{ const sp=speciesById(c.species_id); pts.push([c.lat,c.lng]);
-      L.circleMarker([c.lat,c.lng],{ radius:8, color:"#123b3a", fillColor:"#b9852f", fillOpacity:.9, weight:2 }).addTo(map)
+      L.circleMarker([c.lat,c.lng],{ radius:8, color:"#182241", fillColor:"#7b949c", fillOpacity:.9, weight:2 }).addTo(map)
        .bindPopup(`<b>${esc(sp?.common_name||c.species_other||"Fish")}</b><br>${fmtDate(c.caught_at)}${c.length_in?`<br>${c.length_in}"`:""}`); });
     if(pts.length) map.fitBounds(pts, { padding:[30,30], maxZoom:14 });
   } else {
     const flyCounts={}; S.catches.forEach(c=>{ if(c.fly_id){ const n=S.flies.find(f=>f.id===c.fly_id)?.name; if(n) flyCounts[n]=(flyCounts[n]||0)+1; } });
-    const bar=(obj)=>{ const e=Object.entries(obj).sort((a,b)=>b[1]-a[1]); const max=Math.max(1,...e.map(x=>x[1])); return e.map(([k,v])=>`<div style="margin:6px 0"><div class="row small"><span class="grow">${esc(k)}</span><b>${v}</b></div><div style="height:8px;background:#e9e3d4;border-radius:4px"><div style="height:8px;width:${v/max*100}%;background:var(--teal2);border-radius:4px"></div></div></div>`).join("") || `<p class="small muted">Nothing yet.</p>`; };
+    const bar=(obj)=>{ const e=Object.entries(obj).sort((a,b)=>b[1]-a[1]); const max=Math.max(1,...e.map(x=>x[1])); return e.map(([k,v])=>`<div style="margin:6px 0"><div class="row small"><span class="grow">${esc(k)}</span><b>${v}</b></div><div style="height:8px;background:#ece6d6;border-radius:999px"><div style="height:8px;width:${v/max*100}%;background:var(--slate);border-radius:999px"></div></div></div>`).join("") || `<p class="small muted">Nothing yet.</p>`; };
     body.innerHTML=`<div class="card"><h3>${total} fish logged</h3></div><div class="card"><h3>By species</h3>${bar(bySp)}</div><div class="card"><h3>Best flies</h3>${bar(flyCounts)}</div>`;
   }
   fab("+ Log a fish", ()=>editCatch());
