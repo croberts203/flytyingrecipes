@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "Fly Bench",
+    "slug": "flybench",
+    "version": "1.0.0",
+    "scheme": "flybench",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#f7f3e8",
+    "ios": {
+      "bundleIdentifier": "org.flytyingrecipes.flybench",
+      "buildNumber": "1",
+      "supportsTablet": true,
+      "config": { "usesNonExemptEncryption": false },
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Fly Bench lets you add photos of your flies, catches and materials.",
+        "NSPhotoLibraryAddUsageDescription": "Fly Bench can save photos of your flies and catches."
+      }
+    },
+    "android": {
+      "package": "org.flytyingrecipes.flybench",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0b1a24"
+      },
+      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "blockedPermissions": ["android.permission.RECORD_AUDIO"]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Fly Bench uses the camera to scan barcodes on fly tying materials and to take photos of your flies and catches.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Fly Bench uses your location to tag catches in your fish log and to show your state's fishing rules."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#0b1a24"
+        }
+      ]
+    ]
+  }
+}

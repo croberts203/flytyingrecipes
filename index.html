@@ -88,6 +88,9 @@ ol.steps img{width:100%;border-radius:10px;margin-top:8px}
 #scanner .modes{display:flex;gap:6px;margin-bottom:10px}
 #scanner .modes .chip{background:rgba(255,255,255,.15);color:#fff;border-color:transparent}
 #scanner .modes .chip.on{background:var(--brass)}
+#scanner.native{background:var(--navy)}
+#scanner.native .bar{top:auto;background:none;padding-top:24px}
+.in-app .hide-in-app{display:none!important}
 #map{height:360px;border-radius:var(--r);border:1px solid var(--line)}
 .reg dt{font-size:.75rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:8px}
 .reg dd{margin:2px 0 0}
@@ -854,6 +857,16 @@ async function openScanner(){
       s.style.zIndex=70; s.addEventListener("click",e=>{ if(e.target===s) scanState.busy=false; });
       $("#scanMsg",el).innerHTML=`✓ Read ${esc(code)}. Fill in the form to save it.`;
       s.addEventListener("click",e=>{ if(e.target===s) $("#scanMsg",el).textContent="Point the camera at the barcode on the package."; }); }
+  }
+  if(window.FBNative?.scan){
+    // Phone app: use the phone's own barcode scanner, then show the result here.
+    video.remove(); el.querySelector(".frame").remove(); el.classList.add("native");
+    const go=document.createElement("button"); go.className="btn brass"; go.id="nativeScan"; go.textContent="📷 Scan a barcode";
+    go.style.cssText="width:100%;margin-top:10px;padding:14px;font-size:1.05rem";
+    $("#scanInfo",el).after(go);
+    const nativeScan=async()=>{ try{ const c=await FBNative.scan(); if(scanState){ scanState.busy=false; handleCode(c); } }catch(e){ if(scanState) $("#scanMsg",el).textContent="Tap “Scan a barcode” when you're ready."; } };
+    go.onclick=nativeScan; $("#photoCode",el).classList.add("hide");
+    $("#scanMsg",el).textContent="Opening the camera…"; nativeScan(); return;
   }
   try{
     const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment", width:{ideal:1280}, height:{ideal:720} } });
