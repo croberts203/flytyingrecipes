@@ -82,6 +82,9 @@ ol.steps img{width:100%;border-radius:10px;margin-top:8px}
 .fclink{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:10px 14px;margin:10px 0 6px;color:var(--ink);text-decoration:none;box-shadow:var(--shadow)}
 .fclink .fcico{width:46px;height:30px;flex:none;color:var(--slate);--fish-eye:#fff}.fclink .fcico svg{width:100%;height:100%}
 .fclink .small{color:var(--muted)}.fclink .fcgo{margin-left:auto;font-size:1.6rem;color:var(--sea);line-height:1}
+.urow{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ucheck{display:flex;gap:10px;align-items:flex-start;margin:0;color:var(--ink);font-size:.95rem;flex:1 1 220px}.ucheck input{width:20px;height:20px;margin-top:2px;flex:none;accent-color:var(--navy)}
+.uper{display:flex;align-items:center;gap:6px;margin:0;white-space:nowrap}.uper input{width:74px;padding:6px 8px;border-radius:10px}
 .tie{position:fixed;inset:0;z-index:2000;background:var(--paper);display:flex;flex-direction:column;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
 .tie-top{background:var(--navy);color:#fff;padding:12px 16px 10px;position:relative}
 .tie-name{font:800 1.05rem var(--head);padding-right:40px}.tie-x{position:absolute;right:10px;top:8px;background:none;border:0;color:#fff;font-size:1.4rem;padding:6px 10px;cursor:pointer}
@@ -383,6 +386,60 @@ function matStatus(fm){
   if(fm.category && stocked.some(i => i.material.category === fm.category)) return "maybe";
   return "need";
 }
+/* ---------- Tied a fly: take its materials off the bench ----------
+   Hooks and eyes come off one per fly. Spools, packs and patches come off a share per fly
+   (a thread spool lasts ~50 flies), so the count drops gradually and the low-stock warning still works.
+   Changing an amount in the review sheet remembers it for that material. */
+const USE_PER_FLY = {hook:1, eyes:1, thread:.02, hair:.05, feather:.1, fur:.1, flash:.03, synthetic:.05, body:.07, dubbing:.03, foam:.05, legs:.03, yarn:.05, wire:.02, glue:.01, tool:0, other:.05};
+const fmtQty = q => { q=Number(q)||0; return Number.isInteger(q) ? String(q) : q < 1 ? q.toFixed(2).replace(/0$/,"") : q.toFixed(1).replace(/\.0$/,""); };
+function benchItemFor(fm){
+  const stocked = S.inventory.filter(i => Number(i.quantity) > 0);
+  if(fm.material_id){ const i=stocked.find(i=>i.material_id===fm.material_id); if(i) return {i, exact:true}; }
+  const w = words(fm.material_text);
+  const hit = stocked.find(i => words(`${i.material.name} ${i.material.brand||""}`).some(x=>w.includes(x)));
+  if(hit) return {i:hit, exact:true};
+  const cat = fm.category && stocked.find(i => i.material.category === fm.category);
+  return cat ? {i:cat, exact:false} : null;
+}
+function perFly(i){ let o={}; try{ o=JSON.parse(localStorage.getItem("fb_use")||"{}"); }catch{} return o[i.material_id] ?? USE_PER_FLY[i.material.category] ?? .05; }
+function savePerFly(id,v){ try{ const o=JSON.parse(localStorage.getItem("fb_use")||"{}"); o[id]=v; localStorage.setItem("fb_use",JSON.stringify(o)); }catch{} }
+function useMaterials(f, count=1){
+  if(!requireUser()) return;
+  if(!S.inventory.length){ toast("Add materials to your bench first, then Fly Bench can keep count."); return; }
+  const mats=[...(f.fly_materials||[])].sort((a,b)=>a.sort-b.sort);
+  const seen=new Set(), rows=[];
+  mats.forEach(m=>{ const hit=benchItemFor(m); if(!hit || seen.has(hit.i.id)) return; seen.add(hit.i.id); const pf=perFly(hit.i); if(pf<=0) return; rows.push({ m, i:hit.i, exact:hit.exact, pf, on:true }); });
+  if(!rows.length){ toast("None of this fly's materials are on your bench."); return; }
+  let n=count;
+  const s=sheet(`<h2>Take it off your bench</h2><p class="small muted" style="margin:4px 0 12px">Hooks and eyes come off one per fly. Spools and packs come off a little at a time, so your counts drop as you tie and low-stock warnings still work.</p>
+    <div class="row" style="align-items:center;gap:12px;margin-bottom:8px"><b class="grow">How many ${esc(f.name)} did you tie?</b><div class="qty"><button type="button" id="uN-" aria-label="Fewer">−</button><b id="uN">${n}</b><button type="button" id="uN+" aria-label="More">+</button></div></div>
+    <div id="uRows"></div>
+    <button class="btn" style="width:100%;margin-top:12px" id="uGo">Update my bench</button>
+    <button class="btn ghost" style="width:100%;margin-top:6px" id="uNo">Not now</button>`);
+  const unitWord = c => c==="hook" ? "hook" : c==="eyes" ? "pair" : "of one";
+  const draw=()=>{ $("#uN",s).textContent=n;
+    $("#uRows",s).innerHTML=rows.map((r,k)=>{ const take=Math.min(Number(r.i.quantity), +(r.pf*n).toFixed(3)), left=Number(r.i.quantity)-take;
+      return `<div class="urow"><label class="ucheck"><input type="checkbox" data-k="${k}" ${r.on?"checked":""}><span><b>${esc(r.i.material.name)}</b><span class="small muted">${r.exact?"":" · something similar to "+esc(r.m.material_text)}</span><br><span class="small muted">${fmtQty(r.i.quantity)} → <b class="${left<=Number(r.i.low_stock_at??0)?"need":""}">${fmtQty(left)}</b></span></span></label>
+        <label class="small muted uper">per fly <input type="number" min="0" step="${["hook","eyes"].includes(r.i.material.category)?1:.01}" value="${r.pf}" data-pf="${k}"> ${unitWord(r.i.material.category)}</label></div>`; }).join("");
+    $("#uRows",s).querySelectorAll("[data-k]").forEach(c=>c.onchange=()=>{ rows[+c.dataset.k].on=c.checked; });
+    $("#uRows",s).querySelectorAll("[data-pf]").forEach(inp=>inp.onchange=()=>{ const r=rows[+inp.dataset.pf]; r.pf=Math.max(0,Number(inp.value)||0); r.changed=true; draw(); }); };
+  draw();
+  $("#uN-",s).onclick=()=>{ if(n>1){ n--; draw(); } };
+  $("#uN+",s).onclick=()=>{ n++; draw(); };
+  $("#uNo",s).onclick=()=>s.remove();
+  $("#uGo",s).onclick=async()=>{ const b=$("#uGo",s); b.disabled=true; b.textContent="Updating…";
+    let low=0;
+    for(const r of rows){ if(r.changed) savePerFly(r.i.material_id, r.pf); if(!r.on) continue;
+      const q=Number(r.i.quantity), take=Math.min(q, +(r.pf*n).toFixed(3)); if(take<=0) continue;
+      const nq=+(q-take).toFixed(3);
+      const { error } = await sb.from("inventory").update({ quantity:nq }).eq("id", r.i.id);
+      if(error){ toast("Couldn't update your bench. Please try again."); b.disabled=false; b.textContent="Update my bench"; return; }
+      await sb.from("inventory_events").insert({ material_id:r.i.material_id, delta:-take, source:"use" });
+      r.i.quantity=nq; if(nq<=Number(r.i.low_stock_at??0)) low++; }
+    s.remove(); await loadInventory();
+    toast(low ? `Bench updated. ${low} ${low===1?"item is":"items are"} running low: see Materials › Low / out.` : "Bench updated.", 4000);
+    if(S.tab==="inventory") renderInventory(); };
+}
 function canTie(f){ if(!S.user) return false; const mats=f.fly_materials||[]; return mats.length>0 && mats.every(m => matStatus(m) !== "need"); }
 
 /* ---------------- auth ---------------- */
@@ -542,7 +599,7 @@ function openFly(id){
     <div>${sp.map(x=>`<span class="tag">${esc(x.common_name)}</span>`).join("")}</div>
     ${creatorBlock(f)}
     ${f.description?`<p>${esc(f.description)}</p>`:""}
-    ${steps.length?`<button class="btn" style="width:100%;margin:12px 0 4px" id="tieF">▶ Start tying, step by step</button>`:""}
+    ${steps.length||S.user?`<div class="row" style="gap:8px;margin:12px 0 4px">${steps.length?`<button class="btn grow" id="tieF">▶ Start tying, step by step</button>`:""}${S.user?`<button class="btn alt${steps.length?"":" grow"}" id="tiedF">✓ I tied this</button>`:""}</div>`:""}
     ${f.fishing_tips?`<div class="card"><h3>How to fish it</h3><p class="small" style="margin:6px 0 0">${esc(f.fishing_tips)}</p></div>`:""}
     <div class="card"><div class="row"><h3 class="grow">Materials</h3>${S.user?`<span class="small muted">vs. your bench</span>`:""}</div>
       <ul style="list-style:none;padding:0;margin:8px 0 0">${mats.map(m=>{ const st=matStatus(m); const ph=catPhotoUrl(m.category,96); return `<li style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px"><span class="matthumb sm">${ph?`<img src="${ph}" alt="" loading="lazy">`:FLY_ICON}</span><span>${st?`<span class="dot ${st}"></span>`:""}<b>${esc(m.part||"")}</b>${m.part?": ":""}${esc(m.material_text)}</span>${st!=="have"?`<span style="margin-left:auto">${buyLink({ label:m.material_text, material_id:m.material_id||null, category:m.category||"other" })}</span>`:""}</li>`; }).join("")}</ul><p class="small muted" style="margin:6px 0 0">Material pictures show the type of material. <a href="#" class="matCred">Photo credits</a></p>
@@ -557,6 +614,7 @@ function openFly(id){
     <button class="btn alt" style="width:100%" id="closeF">Close</button>`);
   $("#closeF",s).onclick=()=>s.remove();
   if($("#tieF",s)) $("#tieF",s).onclick=()=>tieMode(f);
+  if($("#tiedF",s)) $("#tiedF",s).onclick=()=>useMaterials(f,1);
   history.replaceState(null,"",location.pathname+location.search+"#fly="+f.id);
   new MutationObserver((_,o)=>{ if(!s.isConnected){ o.disconnect(); if(location.hash==="#fly="+f.id) history.replaceState(null,"",location.pathname+location.search); } }).observe(document.body,{childList:true});
   s.querySelectorAll(".matCred").forEach(x=>x.onclick=e=>{ e.preventDefault(); showPhotoCredits(); });
@@ -579,7 +637,7 @@ function openFly(id){
 async function tieMode(f){
   const mats=[...(f.fly_materials||[])].sort((a,b)=>a.sort-b.sort), steps=[...(f.fly_steps||[])].sort((a,b)=>a.step_no-b.step_no);
   const pages=[{kind:"mats"}, ...steps.map((st,i)=>({kind:"step",st,i})), {kind:"done"}];
-  let at=0, lock=null;
+  let at=0, lock=null, tied=0;
   const grabLock=async()=>{ try{ lock=await navigator.wakeLock?.request("screen"); }catch{} };
   grabLock(); const onVis=()=>{ if(document.visibilityState==="visible" && o.isConnected) grabLock(); }; document.addEventListener("visibilitychange",onVis);
   const o=document.createElement("div"); o.className="tie"; document.body.appendChild(o);
@@ -592,7 +650,7 @@ async function tieMode(f){
     if(pg.kind==="mats") body=`<div class="tie-k">Before you start</div><h2>Get these on your bench</h2><ul class="tie-mats">${mats.map(m=>{ const st=matStatus(m); return `<li><label><input type="checkbox"> <span>${st?`<span class="dot ${st}"></span>`:""}<b>${esc(m.part||"")}</b>${m.part?": ":""}${esc(m.material_text)}</span></label></li>`; }).join("")}</ul>`;
     else if(pg.kind==="step"){ const st=pg.st, ph=st.photo_path?flyPhotoUrl(st.photo_path):null, ref=flyPhotoUrl(f.cover_photo_path)||commonsUrl(f.photo_url,800);
       body=`<div class="tie-k">Step ${pg.i+1} of ${steps.length}</div>${ph?`<img class="tie-img" src="${ph}" alt="">`:ref?`<figure class="tie-ref"><img src="${ref}" alt=""><figcaption>What you're tying</figcaption></figure>`:""}<p class="tie-txt">${esc(st.instruction)}</p>${st.youtube_url?`<a class="btn alt sm" href="${esc(ytWatchUrl(st.youtube_url))}" target="_blank" rel="noopener">▶ Watch this step</a>`:""}`; }
-    else body=`<div class="tie-done">${FLY_ICON}</div><h2>Nice tie!</h2><p class="tie-sub">Your ${esc(f.name)} is ready. Snap a photo, then go catch something with it.</p><div class="row" style="justify-content:center;gap:10px;flex-wrap:wrap"><button class="btn" id="tLog">Log a catch</button><button class="btn alt" id="tAgain">Tie another</button></div>`;
+    else body=`<div class="tie-done">${FLY_ICON}</div><h2>Nice tie!</h2><p class="tie-sub">${tied+1>1?`That's ${tied+1} ${esc(f.name)}s.`:`Your ${esc(f.name)} is ready.`} ${S.user&&S.inventory.length?"Take the materials off your bench so your counts stay right.":"Snap a photo, then go catch something with it."}</p><div class="row" style="justify-content:center;gap:10px;flex-wrap:wrap">${S.user&&S.inventory.length?`<button class="btn" id="tUse">Update my bench</button>`:""}<button class="btn alt" id="tAgain">Tie another</button><button class="btn alt" id="tLog">Log a catch</button></div>`;
     o.innerHTML=`<div class="tie-top"><button class="tie-x" aria-label="Close">✕</button><div class="tie-name">${esc(f.name)}</div><div class="tie-bar"><i style="width:${Math.round(at/(pages.length-1)*100)}%"></i></div></div>
       <div class="tie-body">${body}</div>
       <div class="tie-nav"><button class="btn alt" id="tPrev" ${at===0?"disabled":""}>‹ Back</button><button class="btn" id="tNext">${at===0?"Start ›":pg.kind==="done"?"Finish":"Next ›"}</button></div>`;
@@ -600,7 +658,8 @@ async function tieMode(f){
     o.querySelector("#tPrev").onclick=()=>go(-1);
     o.querySelector("#tNext").onclick=()=> pg.kind==="done" ? close() : go(1);
     if(o.querySelector("#tLog")) o.querySelector("#tLog").onclick=()=>{ close(); document.querySelectorAll(".sheet").forEach(x=>x.remove()); setTab("log"); };
-    if(o.querySelector("#tAgain")) o.querySelector("#tAgain").onclick=()=>{ at=1; draw(); };
+    if(o.querySelector("#tAgain")) o.querySelector("#tAgain").onclick=()=>{ tied++; at=1; draw(); };
+    if(o.querySelector("#tUse")) o.querySelector("#tUse").onclick=()=>{ const n=tied+1; close(); useMaterials(f,n); };
   };
   let x0=null; o.addEventListener("touchstart",e=>{ x0=e.touches[0].clientX; },{passive:true});
   o.addEventListener("touchend",e=>{ if(x0==null) return; const dx=e.changedTouches[0].clientX-x0; x0=null; if(Math.abs(dx)>60 && !e.target.closest("input,label,a")) go(dx<0?1:-1); });
@@ -844,7 +903,7 @@ function invRow(i){
   return `<div class="card row ${isLow?"low":""}" data-inv="${i.id}" style="padding:10px 12px">
     <div class="matthumb${own?" own":""}">${ph?`<img src="${ph}" alt="" loading="lazy">`:FLY_ICON}${own?"":`<span class="addph" title="Add your photo">📷</span>`}</div>
     <div class="grow"><b>${esc(i.material.name)}</b><div class="small muted">${esc([i.material.brand,i.material.color,i.material.size].filter(Boolean).join(" · "))}${i.storage_location?` · 📍${esc(i.storage_location)}`:""}</div>${isLow?`<div class="small need">${Number(i.quantity)===0?"Out":"Low"} ${buyLink({ label:matLabel(i.material), material_id:i.material_id, category:i.material.category })}</div>`:""}</div>
-    <div class="qty"><button data-inc="-1" data-mat="${i.material_id}">−</button><b>${Number(i.quantity)}</b><button data-inc="1" data-mat="${i.material_id}">+</button></div></div>`;
+    <div class="qty"><button data-inc="-1" data-mat="${i.material_id}">−</button><b>${fmtQty(i.quantity)}</b><button data-inc="1" data-mat="${i.material_id}">+</button></div></div>`;
 }
 async function adjust(materialId, delta, source){
   const { data, error } = await sb.rpc("adjust_inventory", { p_material_id: materialId, p_delta: delta, p_source: source });
