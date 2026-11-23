@@ -108,6 +108,10 @@ ol.steps img{width:100%;border-radius:10px;margin-top:8px}
 .sheet .grab{width:40px;height:4px;background:var(--line);border-radius:4px;margin:0 auto 10px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;z-index:80;font-size:.9rem;max-width:90vw;text-align:center}
 #scanner{position:fixed;inset:0;z-index:60;background:#000;display:flex;flex-direction:column}
+.stgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0 10px}.stgrid div{background:var(--paper,#f7f2e7);border-radius:10px;padding:8px;text-align:center}.stgrid b{display:block;font-size:1.3rem}.stgrid span{font-size:.72rem;color:var(--muted,#6b7785)}
+.stbars{display:flex;align-items:flex-end;gap:2px;height:70px;padding:4px 0}.stbars div{flex:1;height:100%;position:relative;display:flex;align-items:flex-end}.stbars i{display:block;width:100%;background:var(--navy,#14202e);border-radius:3px 3px 0 0;opacity:.75}.stbars b{position:absolute;bottom:0;left:0;right:0;background:var(--brass,#c9973b);border-radius:3px 3px 0 0}
+.sttab{width:100%;border-collapse:collapse;font-size:.85rem}.sttab th{font-weight:600;text-align:right;font-size:.72rem;color:var(--muted,#6b7785)}.sttab td{padding:6px 4px;border-top:1px solid var(--line,#e5dfd0);text-align:right}.sttab td:first-child,.sttab th:first-child{text-align:left}
+.stcode{gap:6px;align-items:center;padding:6px 0;border-top:1px solid var(--line,#e5dfd0);flex-wrap:wrap}
 .deskpair{display:flex;gap:14px;align-items:flex-start}.qrbox{width:150px;min-width:150px;height:150px;background:#fff;border-radius:10px;padding:6px;display:grid;place-items:center}.qrbox svg{width:100%;height:100%}
 .sheet.desk>div{max-width:720px}.deskit{padding:10px 12px;margin-bottom:8px}.deskit.done{opacity:.8}.deskit.new{border-left:4px solid var(--brass)}.deskit .row{gap:6px;margin-top:6px;align-items:center}.deskit input,.deskit select{margin:0}
 @media (max-width:640px){.desk-only{display:none}}
@@ -221,6 +225,7 @@ const SUPABASE_URL = "https://rkxzfzzjzrnkiyopbdke.supabase.co";
 const SUPABASE_KEY = "sb_publishable_ypQ91HrykMCwgI59OCRFYg_MFGOgzi9";
 const DEMO = new URLSearchParams(location.search).has("demo");
 const sb = DEMO ? (await import("./demo.js")).demoClient(createClient(SUPABASE_URL, SUPABASE_KEY, { auth:{ persistSession:false } })) : createClient(SUPABASE_URL, SUPABASE_KEY);
+window.Stats?.init("flybench", SUPABASE_URL, SUPABASE_KEY);
 if(DEMO) document.documentElement.classList.add("demo");
 
 const CATEGORIES = ["hook","thread","eyes","hair","feather","fur","flash","synthetic","body","dubbing","foam","legs","yarn","wire","glue","tool","other"];
@@ -487,6 +492,7 @@ function openAuth(){
       : await sb.auth.signUp({ email, password, options:{ data:{ display_name:$("#aName",s).value.trim() || email.split("@")[0], newsletter: $("#aNews",s).checked ? "true" : "false" }, emailRedirectTo: redirect } });
     $("#aGo",s).disabled=false;
     if(r.error) return toast(r.error.message, 4000);
+    if(mode==="up") window.Stats?.track("signup");
     if(mode==="up" && !r.data.session){ s.remove(); return toast("Check your email to confirm your account", 5000); }
     s.remove(); await afterAuth();
   };
@@ -501,11 +507,13 @@ function openAccount(){
     <p class="small muted" id="aiLeft"></p>
     <label class="row" style="gap:8px;align-items:flex-start;margin-top:10px;font-weight:400"><input type="checkbox" id="nlToggle" style="width:auto;margin-top:3px" disabled><span class="small">Weekly email: one fly tying tip, technique or pattern a week from the Fly Tying Recipes blog.</span></label>
     <label>Shop for materials at</label><select id="shopSel">${Object.entries(SHOPS).map(([k,v])=>`<option value="${k}" ${shopKey()===k?"selected":""}>${v.name}</option>`).join("")}</select>
+    ${S.profile?.is_admin?`<button class="btn brass" id="statsBtn" style="width:100%;margin-top:14px">📊 App stats &amp; invite links</button>`:""}
     <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
     <p class="small"><a href="/privacy.html" target="_blank" rel="noopener">Privacy policy</a>${S.hidden?.size?` · <a href="#" id="unhide">Show hidden members (${S.hidden.size})</a>`:""}</p>
     <button class="btn danger" id="delAcct" style="width:100%">Delete my account</button>
     <p class="small muted" style="margin-top:6px">Permanently deletes your login, recipes, materials inventory and fish log.</p>`);
   sb.from("ai_usage").select("count").eq("day", new Date().toISOString().slice(0,10)).maybeSingle().then(({data})=>{ $("#aiLeft",s).textContent = `Photo IDs used today: ${data?.count||0} of 20`; });
+  if($("#statsBtn",s)) $("#statsBtn",s).onclick=()=>{ s.remove(); openStats(); };
   $("#saveDn",s).onclick = async()=>{ await sb.from("profiles").update({display_name:$("#dn",s).value.trim()}).eq("id",S.user.id); await refreshUser(); s.remove(); toast("Saved"); };
   sb.rpc("my_newsletter").then(({data})=>{ const c=$("#nlToggle",s); if(c){ c.checked=!!data; c.disabled=false; } });
   $("#nlToggle",s).onchange = async e=>{ const on=e.target.checked; e.target.disabled=true; const { error } = await sb.rpc("set_newsletter", { p_on:on }); e.target.disabled=false; if(error){ e.target.checked=!on; return toast("Couldn't change your email setting"); } toast(on?"You're on the weekly email":"You won't get the weekly email"); };
@@ -1109,7 +1117,7 @@ function pairLeave(){ if(pairCh){ try{ sb.removeChannel(pairCh); }catch(e){} } p
 function pairSend(event, payload){ return pairCh ? pairCh.send({ type:"broadcast", event, payload }) : Promise.resolve("no-channel"); }
 
 let qrLib = null;
-function loadQR(){ return qrLib ||= new Promise((ok,no)=>{ if(window.qrcode) return ok(window.qrcode); const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"; s.onload=()=>ok(window.qrcode); s.onerror=()=>{ qrLib=null; no(); }; document.head.appendChild(s); }); }
+function loadQR(){ return qrLib ||= new Promise((ok,no)=>{ if(window.qrcode) return ok(window.qrcode); const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"; s.onload=()=>ok(window.qrcode); s.onerror=()=>{ qrLib=null; no(); }; document.head.appendChild(s); }); }
 
 async function openDeskScan(){
   if(!S.user) return openAuth();
@@ -1208,6 +1216,72 @@ async function openDeskScan(){
   $("#deskDone",s).onclick=()=>s.remove();
   new MutationObserver((_,o)=>{ if(!s.isConnected){ o.disconnect(); close(); } }).observe(document.body,{ childList:true });
   draw();
+}
+
+/* ---- usage stats & invite links (admin only) ---- */
+const STAT_EVENTS = { scanBtn:"scan", deskBtn:"desk_scan", rcptBtn:"receipt", tieF:"tie_start", tiedF:"tied", cSave:"catch_logged", cId:"species_id", copyNeed:"shopping_list", eSave:"recipe_saved", tUse:"bench_updated", fcan:"can_tie_now" };
+document.addEventListener("click", e => { if(!window.Stats) return; const b=e.target.closest("button,[id],.flycard,[data-buy],a[href*='avantlink'],a.buy"); if(!b) return;
+  if(STAT_EVENTS[b.id]) Stats.track(STAT_EVENTS[b.id]); else if(b.classList?.contains("flycard")) Stats.track("recipe_open"); else if(b.dataset?.buy!==undefined || b.matches?.("a[href*='avantlink'],a.buy")) Stats.track("buy_click"); }, true);
+const FC_ORIGIN = "https://fishforecast.net", FB_ORIGIN = "https://app.flytyingrecipes.org";
+const pct = (a,b) => b ? Math.round(100*a/b)+"%" : "—";
+async function openStats(days=30){
+  const s = sheet(`<h2>📊 App stats</h2><div class="chips" id="stDays">${[7,30,90].map(d=>`<span class="chip ${d===days?"on":""}" data-d="${d}">${d} days</span>`).join("")}</div><div id="stBody"><p><span class="spinner"></span></p></div>`);
+  s.classList.add("desk");
+  s.querySelectorAll("[data-d]").forEach(c=>c.onclick=()=>{ s.remove(); openStats(+c.dataset.d); });
+  const { data: raw, error } = await sb.rpc("app_stats", { days }); const data = raw || {};
+  if(error){ $("#stBody",s).innerHTML=`<p class="need">${esc(error.message)}</p>`; return; }
+  const name = { forecast:"Fish Bite Forecast", flybench:"Fly Bench" };
+  const tot = a => (data.totals||[]).find(x=>x.app===a) || {}, ret = a => (data.retention||[]).find(x=>x.app===a) || {};
+  const bars = a => { const rows=(data.daily||[]).filter(x=>x.app===a); if(!rows.length) return `<p class="small muted">No visits yet.</p>`;
+    const mx=Math.max(...rows.map(r=>r.devices)); return `<div class="stbars">${rows.map(r=>`<div title="${esc(r.d)}: ${r.devices} people, ${r.new_devices} new"><i style="height:${Math.max(4,100*r.devices/mx)}%"></i><b style="height:${100*r.new_devices/mx}%"></b></div>`).join("")}</div><div class="small muted">Each bar is a day: people who opened the app (gold = first time).</div>`; };
+  const appCard = a => { const t=tot(a), r=ret(a); return `<div class="card"><h3 style="margin-top:0">${name[a]}</h3>
+    <div class="stgrid"><div><b>${t.devices||0}</b><span>people</span></div><div><b>${r.new_devices||0}</b><span>new</span></div><div><b>${pct(r.back_1d,r.new_devices)}</b><span>came back</span></div><div><b>${pct(r.back_7d,r.eligible_7d)}</b><span>back after a week</span></div><div><b>${t.signups||0}</b><span>sign-ups</span></div><div><b>${t.installed_devices||0}</b><span>installed it</span></div></div>
+    ${bars(a)}
+    <div class="small" style="margin-top:8px">${(data.features||[]).filter(f=>f.app===a && f.event!=="signup").slice(0,10).map(f=>`<span class="tag">${esc(f.event.replace(/_/g," "))} · ${f.devices}</span>`).join(" ") || '<span class="muted">No feature use yet.</span>'}</div></div>`; };
+  const refRows = (data.referrals||[]).map(r=>`<tr><td><b>${esc(r.label)}</b><div class="small muted">${esc(r.code)} · ${esc(r.kind||"")} · ${name[r.app]||r.app}</div></td><td>${r.devices}</td><td>${pct(r.back_1d,r.devices)}</td><td>${pct(r.back_7d,r.eligible_7d)}</td><td>${r.signups}</td></tr>`).join("");
+  const codes = data.codes||[];
+  $("#stBody",s).innerHTML = appCard("flybench") + appCard("forecast") + `
+    <div class="card"><h3 style="margin-top:0">Who's sending people</h3>
+      ${refRows ? `<table class="sttab"><tr><th></th><th>People</th><th>Came back</th><th>Week later</th><th>Sign-ups</th></tr>${refRows}</table>` : `<p class="small muted">No one has arrived through an invite link yet.</p>`}
+      <h3>Invite links</h3>
+      ${codes.map(c=>`<div class="row stcode"><div class="grow"><b>${esc(c.label)}</b><div class="small muted">${esc(c.kind)} · ?r=${esc(c.code)}</div></div>
+        ${c.app!=="forecast"?`<button class="btn sm alt" data-copy="${FB_ORIGIN}/?r=${esc(c.code)}">Fly Bench link</button>`:""}${c.app!=="flybench"?`<button class="btn sm alt" data-copy="${FC_ORIGIN}/?r=${esc(c.code)}">Forecast link</button>`:""}
+        <button class="btn sm" data-card="${esc(c.code)}">Counter card</button><button class="btn sm alt" data-delcode="${esc(c.code)}">✕</button></div>`).join("") || `<p class="small muted">Make one for each shop, club, creator or ad, so you can see which brings people who stay.</p>`}
+      <div class="row" style="margin-top:10px"><input id="rcLabel" class="grow" placeholder="Who it's for — e.g. Mayport Fly Shop" maxlength="80">
+        <select id="rcKind" style="width:110px"><option value="shop">Fly shop</option><option value="club">Club</option><option value="creator">Creator</option><option value="event">Show/event</option><option value="ad">Ad</option><option value="other">Other</option></select>
+        <select id="rcApp" style="width:130px"><option value="both">Both apps</option><option value="flybench">Fly Bench</option><option value="forecast">Forecast</option></select></div>
+      <button class="btn brass" id="rcAdd" style="width:100%;margin-top:6px">+ Make invite link</button></div>
+    <p class="small muted">Private to you. Counts use a random ID per browser — no names, emails or locations — and browsers set to “Do Not Track” aren't counted.</p>`;
+  $("#rcAdd",s).onclick = async () => {
+    const label=$("#rcLabel",s).value.trim(); if(!label) return toast("Who is the link for?");
+    let code = label.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,24) || "link";
+    if(codes.some(c=>c.code===code)) code += "-" + Math.random().toString(36).slice(2,5);
+    const { error } = await sb.from("referral_codes").insert({ code, label, kind:$("#rcKind",s).value, app:$("#rcApp",s).value });
+    if(error) return toast(error.message); s.remove(); openStats(days); };
+  s.querySelectorAll("[data-copy]").forEach(b=>b.onclick=async()=>{ try{ await navigator.clipboard.writeText(b.dataset.copy); toast("Link copied"); }catch{ prompt("Copy this link", b.dataset.copy); } });
+  s.querySelectorAll("[data-delcode]").forEach(b=>b.onclick=async()=>{ if(b.dataset.armed){ await sb.from("referral_codes").delete().eq("code", b.dataset.delcode); s.remove(); openStats(days); } else { b.dataset.armed=1; b.textContent="Delete?"; } });
+  s.querySelectorAll("[data-card]").forEach(b=>b.onclick=()=>counterCard(codes.find(c=>c.code===b.dataset.card)));
+}
+// A printable counter card with a QR code for each app the link covers.
+async function counterCard(c){
+  let q; try{ q = await loadQR(); }catch{ return toast("Couldn't load the QR maker — check your connection"); }
+  const svg = url => { const qr=q(0,"M"); qr.addData(url); qr.make(); return qr.createSvgTag({ cellSize:6, margin:2, scalable:true }); };
+  const half = (title, tag, lines, url) => `<div class="half"><div class="qr">${svg(url)}</div><div><h1>${title}</h1><h2>${tag}</h2><ul>${lines.map(l=>`<li>${l}</li>`).join("")}</ul><p class="url">${url.replace(/^https:\/\//,"")}</p></div></div>`;
+  const parts = [];
+  if(c.app!=="forecast") parts.push(half("Fly Bench","Tie it. Fish it. Log it.",["Fly recipes sorted by the fish you're after","Scan your materials — see what you can tie tonight","Step-by-step tying, free"], `${FB_ORIGIN}/?r=${c.code}`));
+  if(c.app!=="flybench") parts.push(half("Fish Bite Forecast","When they'll bite — and what color to throw",["Best times by tide, moon and weather","Lure & fly colors for the light and water","Marine forecast, tides and rules"], `${FC_ORIGIN}/?r=${c.code}`));
+  const w = window.open("", "_blank"); if(!w) return toast("Allow pop-ups to print the card");
+  w.document.write(`<!doctype html><title>Counter card — ${esc(c.label)}</title><style>
+    body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;margin:0;padding:24px;color:#14202e}
+    .card{border:2px solid #14202e;border-radius:18px;padding:22px;max-width:720px;margin:0 auto}
+    .half{display:flex;gap:22px;align-items:center;padding:10px 0}.half+.half{border-top:2px dashed #c9b98f;margin-top:10px;padding-top:20px}
+    .qr{width:170px;min-width:170px}.qr svg{width:100%;height:auto}
+    h1{margin:0;font-size:28px}h2{margin:2px 0 8px;font-size:16px;color:#8a6a1f;font-weight:600}ul{margin:0;padding-left:18px;font-size:15px;line-height:1.5}
+    .url{margin:8px 0 0;font-size:13px;color:#555}.foot{text-align:center;font-size:12px;color:#777;margin-top:12px}
+    @media print{body{padding:0}.noprint{display:none}}</style>
+    <div class="card">${parts.join("")}<div class="foot">Point your phone's camera at a code · Tie &amp; Tide</div></div>
+    <p class="noprint" style="text-align:center"><button onclick="print()" style="font-size:16px;padding:10px 20px;border-radius:999px;border:0;background:#14202e;color:#fff">Print</button></p>`);
+  w.document.close();
 }
 
 /* ---- receipt reader ---- */
@@ -1453,6 +1527,7 @@ sb.auth.onAuthStateChange((evt)=>{ if(evt==="SIGNED_IN"||evt==="SIGNED_OUT") aft
 </script>
 <script src="fish.js"></script>
 <script src="scanner.js"></script>
+<script src="stats.js"></script>
 <script src="tour.js"></script>
 <script src="fbtips.js"></script>
 <script src="staterules.js"></script>
