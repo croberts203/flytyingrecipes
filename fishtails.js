@@ -101,8 +101,9 @@
       if (!R) { wait.innerHTML = fmt("I couldn't load the rules finder. Try again, or see state fishing websites at https://www.fisheries.noaa.gov/recreational-fishing/state-recreational-fishing-websites"); return; }
       return R.locate().then(function (p) {
         var r = p.region, ls = R.links(r);
-        wait.innerHTML = (r ? "You're in <b>" + esc(R.placeName(r)) + "</b>. Here are the official fishing rules:" : "I couldn't work out your state. Try these:") +
-          '<div class="ft-links">' + ls.map(function (l) { return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + " \u2197</a>"; }).join("") + "</div>" +
+        wait.innerHTML = (r ? "You're in <b>" + esc(R.placeName(r)) + "</b>." + (ls.length ? " Here are the official fishing rules:" : "") : "I couldn't work out your state. Try these:") +
+          (ls.length ? '<div class="ft-links">' : '<div>') + ls.map(function (l) { return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + " \u2197</a>"; }).join("") + "</div>" +
+          (R.warning && R.warning(r) ? '<small style="display:block;margin-top:8px;color:#8a3b12;font-weight:600">\u26a0\ufe0f ' + esc(R.warning(r)) + '</small>' : '') +
           '<small style="display:block;margin-top:6px;opacity:.75">Rules change. Check the agency before you keep a fish. Only a rounded location (about 1 km) is used, and nothing is saved.</small>';
         log.scrollTop = log.scrollHeight;
       }).catch(function (e) { wait.innerHTML = fmt(e.message + " You can also look up your state at https://www.fisheries.noaa.gov/recreational-fishing/state-recreational-fishing-websites"); });

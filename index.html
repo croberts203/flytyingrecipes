@@ -895,7 +895,8 @@ function rulesLinks(r, title){
   const ls = FBRules.links(r);
   return `<div class="card rules" style="margin-top:8px"><div class="small muted">${esc(title||"Fishing rules where you are")}</div>
     <div style="font-weight:700;margin:2px 0 8px">📍 ${esc(FBRules.placeName(r))}</div>
-    <div class="row wrap">${ls.map(l=>`<a class="btn sm${l.primary?"":" alt"}" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)} ↗</a>`).join("")}</div>
+    <div class="row wrap${ls.length?"":" hide"}">${ls.map(l=>`<a class="btn sm${l.primary?"":" alt"}" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)} ↗</a>`).join("")}</div>
+    ${FBRules.warning(r)?`<p class="small need" style="margin:8px 0 0">⚠️ ${esc(FBRules.warning(r))}</p>`:""}
     <p class="small muted" style="margin:6px 0 0">Rules change. Check the official agency before you keep a fish.</p></div>`;
 }
 const lookupRegion = (lat,lng) => window.FBRules ? FBRules.lookup(lat,lng) : Promise.resolve(null);
@@ -1012,7 +1013,7 @@ async function renderSpecies(){
   const groups={}; S.species.forEach(sp=>(groups[sp.group_name||"Other"] ||= []).push(sp));
   const nr=S.nearRegion, notFL = nr && nr.region_code && nr.region_code!=="US-FL";
   view.innerHTML = `${nr?rulesLinks(nr,"Fishing rules where you are"):`<div class="card rules"><div class="row"><div class="grow"><b>Fishing rules near me</b><div class="small muted">Use your location to open your state's official fishing rules.</div></div><button class="btn sm" id="nrGo">📍 Find</button></div></div>`}
-    <div class="card" style="background:#fbf3e2"><p class="small" style="margin:0">${notFL?`The limits below are Florida's (FWC). You're in ${esc(nr.region_name)}, so use the links above for the rules that apply to you.`:`Northeast Florida summary of FWC recreational rules, checked when the app was built. Rules change often — always confirm on the official FWC page before keeping a fish.`}</p></div>
+    <div class="card" style="background:#fbf3e2"><p class="small" style="margin:0">${notFL?`The limits below are Florida's (FWC). You're in ${esc(nr.region_name)}, so ${FBRules.links(nr).length?"use the links above":"check your state's fish and wildlife agency"} for the rules that apply to you.`:`Northeast Florida summary of FWC recreational rules, checked when the app was built. Rules change often — always confirm on the official FWC page before keeping a fish.`}</p></div>
     ${Object.entries(groups).map(([g,list])=>`<h3 style="margin:16px 0 8px">${esc(g)}</h3>${list.map(sp=>{ const r=(S.regs[sp.id]||[])[0]; const n=S.flies.filter(f=>(f.fly_species||[]).some(x=>x.species_id===sp.id)).length;
       return `<div class="card" data-sp="${sp.id}" style="cursor:pointer"><div class="row"><div class="grow"><h3>${esc(sp.common_name)}</h3><div class="small muted"><i>${esc(sp.scientific_name||"")}</i></div></div><span class="small muted">${n} flies ›</span></div>
       ${r?`<div class="small" style="margin-top:6px">${[r.size_limit,r.bag_limit,r.season].filter(Boolean).map(esc).join(" · ") || "No specific limits on file"}</div>`:""}</div>`; }).join("")}`).join("")}`;

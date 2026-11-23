@@ -19,10 +19,10 @@
     "US-SC": "https://www.dnr.sc.gov/fishing.html", "US-TX": "https://tpwd.texas.gov/regulations/outdoor-annual/fishing/fishing",
     "US-WA": "https://wdfw.wa.gov/fishing/", "US-WV": "https://wvdnr.gov/2025-fishing-regulations-guide",
     /* Inland states: the official fish & wildlife agency home page */
-    "US-AZ": "https://www.azgfd.com/", "US-AR": "https://www.agfc.com/", "US-CO": "https://cpw.state.co.us/", "US-DC": "https://doee.dc.gov/",
+    "US-AR": "https://www.agfc.com/", "US-CO": "https://cpw.state.co.us/", "US-DC": "https://doee.dc.gov/",
     "US-IL": "https://www.ifishillinois.org/", "US-IN": "https://www.in.gov/dnr/fish-and-wildlife/", "US-IA": "https://www.iowadnr.gov/",
     "US-KS": "https://ksoutdoors.com/", "US-KY": "https://fw.ky.gov/", "US-MI": "https://www.michigan.gov/dnr", "US-MN": "https://www.dnr.state.mn.us/fishing/index.html",
-    "US-MO": "https://mdc.mo.gov/fishing", "US-MT": "https://fwp.mt.gov/", "US-NE": "https://outdoornebraska.gov/", "US-NV": "https://www.ndow.org/",
+    "US-MO": "https://mdc.mo.gov/fishing", "US-MT": "https://fwp.mt.gov/", "US-NV": "https://www.ndow.org/",
     "US-NJ": "https://dep.nj.gov/njfw/", "US-NM": "https://wildlife.dgf.nm.gov/", "US-ND": "https://gf.nd.gov/", "US-OH": "https://ohiodnr.gov/",
     "US-OK": "https://www.wildlifedepartment.com/", "US-RI": "https://dem.ri.gov/", "US-SD": "https://gfp.sd.gov/", "US-TN": "https://www.tn.gov/twra.html",
     "US-UT": "https://wildlife.utah.gov/", "US-VT": "https://vtfishandwildlife.com/", "US-VA": "https://dwr.virginia.gov/", "US-WI": "https://dnr.wisconsin.gov/topic/Fishing",
@@ -60,8 +60,10 @@
   function locate() { return position().then(function (p) { return lookup(p.lat, p.lng).then(function (r) { p.region = r; return p; }); }); }
 
   /* The links for a region: [{label, url, primary}] */
+  var WARN_ONLY = { "US-AZ": "Arizona Game and Fish Department", "US-NE": "Nebraska Game and Parks Commission" };
   function links(r) {
     if (!r || !r.region_name) return [{ label: "State fishing websites (NOAA)", url: NOAA, primary: true }];
+    if (WARN_ONLY[r.region_code]) return [];
     var isUS = (r.country_code || "").toUpperCase() === "US", out = [];
     if (r.region_code === "US-FL") {
       out.push({ label: "FWC saltwater rules", url: "https://myfwc.com/fishing/saltwater/recreational/", primary: true });
@@ -72,6 +74,13 @@
     out.push({ label: out.length ? "Search current rules" : "Find " + r.region_name + " fishing rules", url: "https://www.google.com/search?q=" + q, primary: !out.length });
     return out;
   }
+  /* A caution when there is no checked official link for the place (Arizona, Nebraska, outside the US…) */
+  function warning(r) {
+    if (!r || !r.region_name) return "";
+    if (WARN_ONLY[r.region_code]) return "We can't link " + r.region_name + "'s fishing rules right now. Check the " + WARN_ONLY[r.region_code] + " for current rules before you keep a fish.";
+    if (r.region_code === "US-FL" || SITES[r.region_code]) return "";
+    return "We don't have a checked official link for " + r.region_name + " yet. Use the search, and make sure the page you land on belongs to the official state or government fishing agency before you rely on it.";
+  }
   function placeName(r) { return !r ? "" : r.region_name + ((r.country_code || "").toUpperCase() !== "US" && r.country_name ? ", " + r.country_name : ""); }
-  window.FBRules = { SITES: SITES, NOAA: NOAA, lookup: lookup, position: position, locate: locate, links: links, placeName: placeName };
+  window.FBRules = { SITES: SITES, NOAA: NOAA, lookup: lookup, position: position, locate: locate, links: links, warning: warning, placeName: placeName };
 })();
