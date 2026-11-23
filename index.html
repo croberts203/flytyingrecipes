@@ -416,7 +416,7 @@ function useMaterials(f, count=1){
     <div id="uRows"></div>
     <button class="btn" style="width:100%;margin-top:12px" id="uGo">Update my bench</button>
     <button class="btn ghost" style="width:100%;margin-top:6px" id="uNo">Not now</button>`);
-  const unitWord = c => c==="hook" ? "hook" : c==="eyes" ? "pair" : "of one";
+  const unitWord = c => c==="hook" ? "hook" : c==="eyes" ? "pair" : ["thread","wire"].includes(c) ? "of a spool" : c==="glue" ? "of a bottle" : c==="hair" ? "of a patch" : "of a pack";
   const draw=()=>{ $("#uN",s).textContent=n;
     $("#uRows",s).innerHTML=rows.map((r,k)=>{ const take=Math.min(Number(r.i.quantity), +(r.pf*n).toFixed(3)), left=Number(r.i.quantity)-take;
       return `<div class="urow"><label class="ucheck"><input type="checkbox" data-k="${k}" ${r.on?"checked":""}><span><b>${esc(r.i.material.name)}</b><span class="small muted">${r.exact?"":" · something similar to "+esc(r.m.material_text)}</span><br><span class="small muted">${fmtQty(r.i.quantity)} → <b class="${left<=Number(r.i.low_stock_at??0)?"need":""}">${fmtQty(left)}</b></span></span></label>
