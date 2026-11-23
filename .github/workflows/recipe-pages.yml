@@ -1,0 +1,27 @@
+name: Build public recipe pages
+# Rebuilds /fly/ and /fish/ pages and the sitemap from the shared recipes, so new recipes show up on Google.
+on:
+  schedule:
+    - cron: "17 7 * * *"   # every night
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["tools/build-pages.mjs", ".github/workflows/recipe-pages.yml"]
+permissions:
+  contents: write
+concurrency: recipe-pages
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tools/build-pages.mjs
+      - name: Commit changes
+        run: |
+          git config user.name "fly-bench-bot"
+          git config user.email "fly-bench-bot@users.noreply.github.com"
+          git add -A fly fish sitemap.xml robots.txt
+          if git diff --cached --quiet; then echo "No changes"; else git commit -m "Update public recipe pages" && git push; fi
