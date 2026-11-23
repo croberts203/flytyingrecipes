@@ -783,17 +783,23 @@ async function openScanner(){
     <div class="bar"><div class="modes"><span class="chip on" data-mode="add">Bought (+1)</span><span class="chip" data-mode="use">Used up (−1)</span><span class="chip" data-mode="haul">Haul mode</span></div>
     <div id="scanMsg" class="small">Point the camera at the barcode on the package.</div>
     <div id="haulList" class="small" style="margin-top:6px"></div>
-    <div class="row" style="margin-top:10px"><button class="btn alt grow" id="manualCode">Type code</button><button class="btn brass grow hide" id="haulSave">Save haul</button><button class="btn grow" id="scanDone">Done</button></div></div>`;
+    <div class="row" style="margin-top:10px"><button class="btn alt grow" id="photoCode">📸 Photo</button><button class="btn alt grow" id="manualCode">Type code</button><button class="btn brass grow hide" id="haulSave">Save haul</button><button class="btn grow" id="scanDone">Done</button></div></div>`;
   document.body.appendChild(el);
   const video=$("video",el);
   scanState = { mode:"add", busy:false, last:"", lastT:0, haul:new Map(), stop:null };
   el.querySelectorAll("[data-mode]").forEach(c=>c.onclick=()=>{ scanState.mode=c.dataset.mode; el.querySelectorAll("[data-mode]").forEach(x=>x.classList.toggle("on",x===c)); $("#haulSave",el).classList.toggle("hide", scanState.mode!=="haul"); });
   const close = () => { scanState?.stop?.(); el.remove(); scanState=null; if(S.tab==="inventory") renderInventory(); };
   $("#scanDone",el).onclick=close;
-  $("#manualCode",el).onclick=()=>{ const c=prompt("Enter the barcode number"); if(c) handleCode(c.trim()); };
+  $("#manualCode",el).onclick=()=>{ const c=prompt("Enter the barcode number"); if(c) handleCode(c.replace(/\D/g,"")); };
+  $("#photoCode",el).onclick=()=>{ const f=document.createElement("input"); f.type="file"; f.accept="image/*"; f.capture="environment";
+    f.onchange=async()=>{ const file=f.files[0]; if(!file) return; $("#scanMsg",el).innerHTML=`<span class="spinner"></span> Reading the photo…`;
+      const c = window.FBScan ? await FBScan.decodeImage(file) : null;
+      if(c) handleCode(c); else $("#scanMsg",el).textContent="Couldn't find a barcode in that photo. Get closer, keep it flat and in focus, or tap “Type code”."; };
+    f.click(); };
   $("#haulSave",el).onclick=async()=>{ for(const [mid,v] of scanState.haul) await adjust(mid, v.n, "haul"); toast(`Saved ${scanState.haul.size} item(s)`); scanState.haul.clear(); drawHaul(); };
   const drawHaul=()=>{ $("#haulList",el).innerHTML=[...scanState.haul.values()].map(v=>`${esc(v.name)} ×${v.n}`).join(" · "); };
   async function handleCode(code){
+    code = window.FBScan ? FBScan.normalize(code) : String(code||"").trim(); if(!code) return;
     const now=Date.now(); if(scanState.busy || (code===scanState.last && now-scanState.lastT<2500)) return;
     scanState.busy=true; scanState.last=code; scanState.lastT=now; navigator.vibrate?.(60);
     const { data } = await sb.from("material_barcodes").select("material:materials(*)").eq("barcode", code).maybeSingle();
@@ -816,19 +822,12 @@ async function openScanner(){
     video.srcObject=stream; await video.play();
     let running=true;
     scanState.stop=()=>{ running=false; stream.getTracks().forEach(t=>t.stop()); };
-    if("BarcodeDetector" in window){
-      const det = new BarcodeDetector({ formats:["ean_13","ean_8","upc_a","upc_e","code_128","code_39","qr_code"] });
-      const tick = async()=>{ if(!running) return; try{ const r=await det.detect(video); if(r[0]) handleCode(r[0].rawValue); }catch{} setTimeout(tick, 250); };
-      tick();
-    } else {
-      $("#scanMsg",el).textContent="Loading scanner…";
-      const { BrowserMultiFormatReader } = await import("https://esm.sh/@zxing/browser@0.1.5");
-      const reader = new BrowserMultiFormatReader();
-      $("#scanMsg",el).textContent="Point the camera at the barcode on the package.";
-      const loop = async()=>{ while(running){ try{ const r = await reader.decodeOnceFromVideoElement(video); if(r && running) handleCode(r.getText()); }catch{} await new Promise(r=>setTimeout(r,400)); } };
-      loop();
-    }
-  }catch(err){ console.error(err); $("#scanMsg",el).textContent="Camera unavailable. Allow camera access, or tap “Type code”."; }
+    if(!window.FBScan){ $("#scanMsg",el).textContent="Barcode reader didn't load. Tap “📸 Photo” or “Type code”."; return; }
+    const stopRead = FBScan.start(video, (code, err)=>{
+      if(err){ $("#scanMsg",el).textContent = err.message+" You can also tap “📸 Photo”."; return; }
+      handleCode(code); });
+    const prevStop = scanState.stop; scanState.stop = ()=>{ stopRead(); prevStop(); };
+  }catch(err){ console.error(err); $("#scanMsg",el).textContent="Camera unavailable. Allow camera access for this site, or tap “📸 Photo” or “Type code”."; }
 }
 
 /* ---- receipt reader ---- */
@@ -1064,6 +1063,7 @@ sb.auth.onAuthStateChange((evt)=>{ if(evt==="SIGNED_IN"||evt==="SIGNED_OUT") aft
   if(wantNew){ if(S.user) editFly(); else { S.pendingNew=true; openAuth(); } }
 })();
 </script>
+<script src="scanner.js"></script>
 <script src="staterules.js"></script>
 <script src="fishtails.js" data-where="app" data-side="left" data-bottom="78" defer></script>
 </body>
