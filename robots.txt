@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /mobile/
+Disallow: /tools/
+Sitemap: https://app.flytyingrecipes.org/sitemap.xml
