@@ -166,6 +166,7 @@ body:has(.sheet) #ft-btn, body:has(#scanner) #ft-btn{display:none!important} /* 
 .empty.nice .ico svg{width:28px;height:28px}
 .empty.nice h3{margin-bottom:4px}
 .empty.nice p{margin:0 0 12px}
+html.demo header.top .sub::after{content:" \00B7  DEMO";color:var(--sea)}
 </style>
 </head>
 <body>
@@ -187,7 +188,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 /* ---------------- config ---------------- */
 const SUPABASE_URL = "https://rkxzfzzjzrnkiyopbdke.supabase.co";
 const SUPABASE_KEY = "sb_publishable_ypQ91HrykMCwgI59OCRFYg_MFGOgzi9";
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+const DEMO = new URLSearchParams(location.search).has("demo");
+const sb = DEMO ? (await import("./demo.js")).demoClient(createClient(SUPABASE_URL, SUPABASE_KEY, { auth:{ persistSession:false } })) : createClient(SUPABASE_URL, SUPABASE_KEY);
+if(DEMO) document.documentElement.classList.add("demo");
 
 const CATEGORIES = ["hook","thread","eyes","hair","feather","fur","flash","synthetic","body","dubbing","foam","legs","yarn","wire","glue","tool","other"];
 const CAT_LABEL = {hook:"Hooks",thread:"Thread",eyes:"Eyes & beads",hair:"Hair (bucktail, calf)",feather:"Feathers & hackle",fur:"Fur & rabbit",flash:"Flash & tinsel",synthetic:"Synthetic fibers",body:"Body (chenille, tubing)",dubbing:"Dubbing",foam:"Foam",legs:"Rubber legs",yarn:"Yarn",wire:"Wire",glue:"Glue & resin",tool:"Tools",other:"Other"};
