@@ -391,7 +391,7 @@ function matStatus(fm){
    (a thread spool lasts ~50 flies), so the count drops gradually and the low-stock warning still works.
    Changing an amount in the review sheet remembers it for that material. */
 const USE_PER_FLY = {hook:1, eyes:1, thread:.02, hair:.05, feather:.1, fur:.1, flash:.03, synthetic:.05, body:.07, dubbing:.03, foam:.05, legs:.03, yarn:.05, wire:.02, glue:.01, tool:0, other:.05};
-const fmtQty = q => { q=Number(q)||0; return Number.isInteger(q) ? String(q) : q < 1 ? q.toFixed(2).replace(/0$/,"") : q.toFixed(1).replace(/\.0$/,""); };
+const fmtQty = q => { q=Number(q)||0; return Number.isInteger(q) ? String(q) : (q < 10 ? q.toFixed(2) : q.toFixed(1)).replace(/\.?0+$/,""); };
 function benchItemFor(fm){
   const stocked = S.inventory.filter(i => Number(i.quantity) > 0);
   if(fm.material_id){ const i=stocked.find(i=>i.material_id===fm.material_id); if(i) return {i, exact:true}; }
@@ -412,7 +412,7 @@ function useMaterials(f, count=1){
   if(!rows.length){ toast("None of this fly's materials are on your bench."); return; }
   let n=count;
   const s=sheet(`<h2>Take it off your bench</h2><p class="small muted" style="margin:4px 0 12px">Hooks and eyes come off one per fly. Spools and packs come off a little at a time, so your counts drop as you tie and low-stock warnings still work.</p>
-    <div class="row" style="align-items:center;gap:12px;margin-bottom:8px"><b class="grow">How many ${esc(f.name)} did you tie?</b><div class="qty"><button type="button" id="uN-" aria-label="Fewer">−</button><b id="uN">${n}</b><button type="button" id="uN+" aria-label="More">+</button></div></div>
+    <div class="row" style="align-items:center;gap:12px;margin-bottom:8px"><b class="grow">How many ${esc(f.name)} did you tie?</b><div class="qty"><button type="button" id="uDec" aria-label="Fewer">−</button><b id="uN">${n}</b><button type="button" id="uInc" aria-label="More">+</button></div></div>
     <div id="uRows"></div>
     <button class="btn" style="width:100%;margin-top:12px" id="uGo">Update my bench</button>
     <button class="btn ghost" style="width:100%;margin-top:6px" id="uNo">Not now</button>`);
@@ -424,8 +424,8 @@ function useMaterials(f, count=1){
     $("#uRows",s).querySelectorAll("[data-k]").forEach(c=>c.onchange=()=>{ rows[+c.dataset.k].on=c.checked; });
     $("#uRows",s).querySelectorAll("[data-pf]").forEach(inp=>inp.onchange=()=>{ const r=rows[+inp.dataset.pf]; r.pf=Math.max(0,Number(inp.value)||0); r.changed=true; draw(); }); };
   draw();
-  $("#uN-",s).onclick=()=>{ if(n>1){ n--; draw(); } };
-  $("#uN+",s).onclick=()=>{ n++; draw(); };
+  $("#uDec",s).onclick=()=>{ if(n>1){ n--; draw(); } };
+  $("#uInc",s).onclick=()=>{ n++; draw(); };
   $("#uNo",s).onclick=()=>s.remove();
   $("#uGo",s).onclick=async()=>{ const b=$("#uGo",s); b.disabled=true; b.textContent="Updating…";
     let low=0;
