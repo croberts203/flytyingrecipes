@@ -889,44 +889,26 @@ function regsHtml(spId, where){
     <p class="small muted" style="margin:10px 0 0">Summary checked ${rs[0]?new Date(rs[0].verified_on+"T12:00").toLocaleDateString():""}. Rules change — verify before you keep a fish.</p>
     <a class="btn sm" style="display:inline-block;margin-top:8px;text-decoration:none" href="${esc(sp.fwc_url)}" target="_blank" rel="noopener">Official FWC page ↗</a></div>`;
 }
-/* Official state fishing sites: NOAA Fisheries' list of state recreational fishing websites */
-const STATE_FISH_SITES = {
-  "US-AK":"https://www.adfg.alaska.gov/index.cfm?adfg=fishingSport.main","US-AL":"https://www.outdooralabama.com/fishing",
-  "US-CA":"https://www.wildlife.ca.gov/Fishing","US-CT":"https://portal.ct.gov/deep/fishing/regulations/fishing-regulations",
-  "US-DE":"https://dnrec.alpha.delaware.gov/fish-wildlife/licenses/","US-FL":"https://myfwc.com/fishing/",
-  "US-GA":"https://coastalgadnr.org/RecreationalFishing","US-HI":"https://dlnr.hawaii.gov/dar/fishing/",
-  "US-ID":"https://idfg.idaho.gov/fish","US-LA":"https://www.wlf.louisiana.gov/fishing/recreational-fishing",
-  "US-MA":"https://www.mass.gov/eea/agencies/dfg/dmf/recreational-fishing/","US-MD":"https://dnr.maryland.gov/Fisheries/Pages/default.aspx",
-  "US-ME":"https://www.maine.gov/IFW/fishing-boating/fishing/laws-rules/index.html","US-MS":"https://www.dmr.ms.gov/recreational-fishing",
-  "US-NC":"https://deq.nc.gov/about/divisions/marine-fisheries","US-NH":"https://www.wildlife.nh.gov/saltwater-fisheries-new-hampshire/recreational-saltwater-fishing",
-  "US-NY":"https://www.dec.ny.gov/outdoor/fishing.html","US-OR":"https://myodfw.com/fishing","US-PA":"https://www.fishandboat.com/Pages/default.aspx",
-  "US-SC":"https://www.dnr.sc.gov/fishing.html","US-TX":"https://tpwd.texas.gov/regulations/outdoor-annual/fishing/fishing",
-  "US-WA":"https://wdfw.wa.gov/fishing/","US-WV":"https://wvdnr.gov/2025-fishing-regulations-guide"
-};
-function rulesLinks(r){
-  if(!r || !r.region_name) return "";
-  const q = encodeURIComponent(`${r.region_name} fishing regulations official`);
-  const isUS = (r.country_code||"").toUpperCase()==="US";
-  const search = `https://www.google.com/search?q=${q}${isUS?"+site%3A.gov":""}`;
-  const off = STATE_FISH_SITES[r.region_code];
-  const fl = r.region_code==="US-FL";
-  return `<div class="card rules" style="margin-top:8px"><div class="small muted">Fishing rules where you are</div>
-    <div style="font-weight:700;margin:2px 0 8px">📍 ${esc(r.region_name)}${!isUS&&r.country_name?`, ${esc(r.country_name)}`:""}</div>
-    <div class="row wrap">${fl?`<a class="btn sm" href="https://myfwc.com/fishing/saltwater/recreational/" target="_blank" rel="noopener">FWC saltwater rules ↗</a><a class="btn sm" href="https://myfwc.com/fishing/freshwater/regulations/" target="_blank" rel="noopener">FWC freshwater rules ↗</a>`
-      : off?`<a class="btn sm" href="${esc(off)}" target="_blank" rel="noopener">Official ${esc(r.region_name)} fishing site ↗</a>`:""}
-      <a class="btn sm alt" href="${esc(search)}" target="_blank" rel="noopener">${off||fl?"Search current rules":"Find "+esc(r.region_name)+" fishing rules"} ↗</a></div>
+/* Fishing rules for a place: links come from staterules.js (window.FBRules), shared with the website */
+function rulesLinks(r, title){
+  if(!r || !r.region_name || !window.FBRules) return "";
+  const ls = FBRules.links(r);
+  return `<div class="card rules" style="margin-top:8px"><div class="small muted">${esc(title||"Fishing rules where you are")}</div>
+    <div style="font-weight:700;margin:2px 0 8px">📍 ${esc(FBRules.placeName(r))}</div>
+    <div class="row wrap">${ls.map(l=>`<a class="btn sm${l.primary?"":" alt"}" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)} ↗</a>`).join("")}</div>
     <p class="small muted" style="margin:6px 0 0">Rules change. Check the official agency before you keep a fish.</p></div>`;
 }
-/* Turns the phone's live GPS fix into a state/province. Only a rounded position (~1 km) is sent. */
-async function lookupRegion(lat, lng){
-  const u = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat.toFixed(2)}&longitude=${lng.toFixed(2)}&localityLanguage=en`;
-  const ctl = new AbortController(); const t = setTimeout(()=>ctl.abort(), 8000);
-  try{
-    const d = await (await fetch(u, { signal:ctl.signal })).json();
-    if(!d || d.lookupSource!=="reverseGeocoding" || !d.principalSubdivision) return null;
-    return { region_code:(d.principalSubdivisionCode||"").slice(0,10)||null, region_name:String(d.principalSubdivision).slice(0,80),
-             country_code:(d.countryCode||"").slice(0,3)||null, country_name:d.countryName||"" };
-  }catch(e){ return null; } finally { clearTimeout(t); }
+const lookupRegion = (lat,lng) => window.FBRules ? FBRules.lookup(lat,lng) : Promise.resolve(null);
+/* "Fishing rules near me": GPS → state → official links. Used on the Species tab and by #rules links. */
+function openNearbyRules(){
+  const s=sheet(`<h2>Fishing rules near me</h2><div id="nrBox"><p class="small muted"><span class="spinner"></span> Getting your location…</p></div>
+    <p class="small muted">Only a rounded position (about 1 km) is used to find your state. Nothing is saved.</p><button class="btn alt" style="width:100%" id="nrX">Close</button>`);
+  $("#nrX",s).onclick=()=>s.remove();
+  if(!window.FBRules){ $("#nrBox",s).innerHTML=`<p class="small need">Couldn't load the rules finder. Check your connection.</p>`; return; }
+  FBRules.locate().then(p=>{ S.nearRegion=p.region||null;
+    $("#nrBox",s).innerHTML = p.region ? rulesLinks(p.region,"You're in") : `<p class="small">Couldn't work out your state. <a href="${FBRules.NOAA}" target="_blank" rel="noopener">State fishing websites ↗</a></p>`;
+    if(S.tab==="species") renderSpecies(); })
+  .catch(e=>{ $("#nrBox",s).innerHTML=`<p class="small need">${esc(e.message)}</p><p class="small"><a href="${FBRules.NOAA}" target="_blank" rel="noopener">State fishing websites ↗</a></p>`; });
 }
 function editCatch(c=null){
   const isNew=!c;
@@ -982,7 +964,7 @@ function editCatch(c=null){
   $("#cGps",s).onclick=()=>{ $("#gpsTxt",s).innerHTML=`<span class="spinner"></span>`;
     navigator.geolocation.getCurrentPosition(async p=>{ lat=p.coords.latitude; lng=p.coords.longitude; $("#gpsTxt",s).textContent=`${lat.toFixed(5)}, ${lng.toFixed(5)} (±${Math.round(p.coords.accuracy)} m)`;
         $("#rulesBox",s).innerHTML=`<p class="small muted" style="margin:6px 0 0"><span class="spinner"></span> Finding local fishing rules…</p>`;
-        const r = await lookupRegion(lat, lng); if(r){ region = r; showSp(); }
+        const r = await lookupRegion(lat, lng); if(r){ region = r; S.nearRegion = r; showSp(); }
         $("#rulesBox",s).innerHTML = r ? rulesLinks(r) : `<p class="small muted" style="margin:6px 0 0">Couldn't look up your state. <a href="https://www.fisheries.noaa.gov/recreational-fishing/state-recreational-fishing-websites" target="_blank" rel="noopener">State fishing websites ↗</a></p>`; },
       err=>{ $("#gpsTxt",s).textContent="Couldn't get location — allow location access"; }, { enableHighAccuracy:true, timeout:15000 }); };
   if(isNew) $("#cGps",s).click();
@@ -1028,10 +1010,13 @@ function openCatch(c){
 async function renderSpecies(){
   if(!S.flies) await loadFlies();
   const groups={}; S.species.forEach(sp=>(groups[sp.group_name||"Other"] ||= []).push(sp));
-  view.innerHTML = `<div class="card" style="background:#fbf3e2"><p class="small" style="margin:0">Northeast Florida summary of FWC recreational rules, checked when the app was built. Rules change often — always confirm on the official FWC page before keeping a fish.</p></div>
+  const nr=S.nearRegion, notFL = nr && nr.region_code && nr.region_code!=="US-FL";
+  view.innerHTML = `${nr?rulesLinks(nr,"Fishing rules where you are"):`<div class="card rules"><div class="row"><div class="grow"><b>Fishing rules near me</b><div class="small muted">Use your location to open your state's official fishing rules.</div></div><button class="btn sm" id="nrGo">📍 Find</button></div></div>`}
+    <div class="card" style="background:#fbf3e2"><p class="small" style="margin:0">${notFL?`The limits below are Florida's (FWC). You're in ${esc(nr.region_name)}, so use the links above for the rules that apply to you.`:`Northeast Florida summary of FWC recreational rules, checked when the app was built. Rules change often — always confirm on the official FWC page before keeping a fish.`}</p></div>
     ${Object.entries(groups).map(([g,list])=>`<h3 style="margin:16px 0 8px">${esc(g)}</h3>${list.map(sp=>{ const r=(S.regs[sp.id]||[])[0]; const n=S.flies.filter(f=>(f.fly_species||[]).some(x=>x.species_id===sp.id)).length;
       return `<div class="card" data-sp="${sp.id}" style="cursor:pointer"><div class="row"><div class="grow"><h3>${esc(sp.common_name)}</h3><div class="small muted"><i>${esc(sp.scientific_name||"")}</i></div></div><span class="small muted">${n} flies ›</span></div>
       ${r?`<div class="small" style="margin-top:6px">${[r.size_limit,r.bag_limit,r.season].filter(Boolean).map(esc).join(" · ") || "No specific limits on file"}</div>`:""}</div>`; }).join("")}`).join("")}`;
+  if($("#nrGo")) $("#nrGo").onclick=openNearbyRules;
   view.querySelectorAll("[data-sp]").forEach(el=>el.onclick=()=>{ const sp=speciesById(+el.dataset.sp);
     const s=sheet(`<h2>${esc(sp.common_name)}</h2><p class="small muted"><i>${esc(sp.scientific_name||"")}</i></p>${sp.id_tips?`<p class="small"><b>How to ID:</b> ${esc(sp.id_tips)}</p>`:""}${regsHtml(sp.id)}
       <button class="btn" style="width:100%" id="sf">See flies for ${esc(sp.common_name.replace(/ \(.+\)/,""))}</button>`);
@@ -1048,12 +1033,14 @@ sb.auth.onAuthStateChange((evt)=>{ if(evt==="SIGNED_IN"||evt==="SIGNED_OUT") aft
   const wantDelete = location.hash==="#delete-account";
   if(wantDelete){ history.replaceState(null,"",location.pathname); if(S.user) openAccount(); else { S.pendingAccount=true; openAuth(); } }
   if(location.hash==="#subscribe"){ history.replaceState(null,"",location.pathname); openSubscribe(); }
+  if(location.hash==="#rules"){ history.replaceState(null,"",location.pathname); openNearbyRules(); }
   const wantNew = location.hash==="#new";
   if(wantNew){ history.replaceState(null,"",location.pathname); S.tab="flies"; document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("on",x.dataset.tab==="flies")); }
   await render();
   if(wantNew){ if(S.user) editFly(); else { S.pendingNew=true; openAuth(); } }
 })();
 </script>
+<script src="staterules.js"></script>
 <script src="fishtails.js" data-where="app" data-side="left" data-bottom="78" defer></script>
 </body>
 </html>

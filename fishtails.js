@@ -23,6 +23,7 @@
 .ft-bot{background:#fff;border:1px solid #e8dfc9;align-self:flex-start;border-bottom-left-radius:4px}\
 .ft-you{background:" + GREEN + ";color:#fff;align-self:flex-end;border-bottom-right-radius:4px}\
 .ft-m a{color:inherit;text-decoration:underline}\
+.ft-links{display:flex;flex-direction:column;gap:6px;margin-top:8px}.ft-links a{display:block;background:" + GREEN + ";color:#fff!important;text-decoration:none;border-radius:10px;padding:8px 10px;font-weight:600}\
 .ft-chips{display:flex;flex-wrap:wrap;gap:6px}.ft-chips button{border:1px solid " + GOLD + ";background:#fff;color:#5a4214;border-radius:999px;padding:6px 10px;font:13px system-ui,sans-serif;cursor:pointer}\
 #ft-form{display:flex;gap:8px;padding:10px;border-top:1px solid #e8dfc9;background:#fff}\
 #ft-in{flex:1;border:1px solid #d9cfb6;border-radius:12px;padding:9px 11px;font:15px system-ui,sans-serif;resize:none;min-height:42px!important;height:42px;max-height:90px;margin:0;width:auto}\
@@ -41,7 +42,7 @@
   panel.innerHTML = '<div id="ft-head"><span class="ft-ico" style="width:32px;height:32px;border-radius:50%;background:' + GOLD + ';display:grid;place-items:center">🐟</span><div><b>Fish Tails</b><small>Fly tying and app help</small></div><button id="ft-x" aria-label="Close">×</button></div>' +
     '<div id="ft-log" aria-live="polite"></div>' +
     '<form id="ft-form"><textarea id="ft-in" rows="1" maxlength="1500" placeholder="Ask about a fly or the app…" aria-label="Your question"></textarea><button id="ft-send" type="submit">Send</button></form>' +
-    '<div id="ft-note">AI answers can be wrong. Check fishing rules at myfwc.com. Account help: support@flytyingrecipes.org</div>';
+    '<div id="ft-note">AI answers can be wrong. Check your state’s official fishing rules. Account help: support@flytyingrecipes.org</div>';
   document.body.appendChild(btn); document.body.appendChild(panel);
 
   var log = panel.querySelector("#ft-log"), form = panel.querySelector("#ft-form"), input = panel.querySelector("#ft-in"), send = panel.querySelector("#ft-send");
@@ -64,6 +65,8 @@
   }
   function chips() {
     var c = document.createElement("div"); c.className = "ft-chips";
+    var nb = document.createElement("button"); nb.type = "button"; nb.textContent = "📍 Fishing rules near me";
+    nb.onclick = function () { c.remove(); nearMe(); }; c.appendChild(nb);
     ["How do I scan a material?", "What fly for redfish?", "Thread size for a Clouser?", "How do I share a recipe?"].forEach(function (q) {
       var b = document.createElement("button"); b.type = "button"; b.textContent = q;
       b.onclick = function () { c.remove(); ask(q); }; c.appendChild(b);
@@ -82,6 +85,29 @@
   input.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event("submit")); } });
   form.onsubmit = function (e) { e.preventDefault(); var q = input.value.trim(); if (q) { input.value = ""; ask(q); } };
 
+  /* GPS → state → official rules links (staterules.js). Not sent to the AI. */
+  var rulesSrc = (me && me.src || "https://app.flytyingrecipes.org/fishtails.js").replace(/fishtails\.js.*$/, "staterules.js");
+  function loadRules() {
+    return new Promise(function (ok) {
+      if (window.FBRules) return ok(window.FBRules);
+      var sc = document.createElement("script"); sc.src = rulesSrc; sc.onload = function () { ok(window.FBRules || null); }; sc.onerror = function () { ok(null); };
+      document.head.appendChild(sc);
+    });
+  }
+  function nearMe() {
+    add("user", "Fishing rules near me");
+    var wait = add("assistant", "Getting your location…");
+    loadRules().then(function (R) {
+      if (!R) { wait.innerHTML = fmt("I couldn't load the rules finder. Try again, or see state fishing websites at https://www.fisheries.noaa.gov/recreational-fishing/state-recreational-fishing-websites"); return; }
+      return R.locate().then(function (p) {
+        var r = p.region, ls = R.links(r);
+        wait.innerHTML = (r ? "You're in <b>" + esc(R.placeName(r)) + "</b>. Here are the official fishing rules:" : "I couldn't work out your state. Try these:") +
+          '<div class="ft-links">' + ls.map(function (l) { return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + " \u2197</a>"; }).join("") + "</div>" +
+          '<small style="display:block;margin-top:6px;opacity:.75">Rules change. Check the agency before you keep a fish. Only a rounded location (about 1 km) is used, and nothing is saved.</small>';
+        log.scrollTop = log.scrollHeight;
+      }).catch(function (e) { wait.innerHTML = fmt(e.message + " You can also look up your state at https://www.fisheries.noaa.gov/recreational-fishing/state-recreational-fishing-websites"); });
+    });
+  }
   function ask(q) {
     if (busy) return; busy = true; send.disabled = true;
     var ch = log.querySelector(".ft-chips"); if (ch) ch.remove();
