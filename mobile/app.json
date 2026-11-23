@@ -12,7 +12,9 @@
       "bundleIdentifier": "org.flytyingrecipes.flybench",
       "buildNumber": "1",
       "supportsTablet": true,
-      "config": { "usesNonExemptEncryption": false },
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Fly Bench lets you add photos of your flies, catches and materials.",
         "NSPhotoLibraryAddUsageDescription": "Fly Bench can save photos of your flies and catches."
@@ -25,8 +27,14 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0b1a24"
       },
-      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
-      "blockedPermissions": ["android.permission.RECORD_AUDIO"]
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
       [
@@ -53,6 +61,12 @@
           "backgroundColor": "#0b1a24"
         }
       ]
-    ]
+    ],
+    "owner": "croberts203s-team",
+    "extra": {
+      "eas": {
+        "projectId": "955eeaa0-681e-4a9e-94df-84493997820d"
+      }
+    }
   }
 }
