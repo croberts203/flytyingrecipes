@@ -82,7 +82,7 @@ ol.steps img{width:100%;border-radius:10px;margin-top:8px}
 .fclink{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:10px 14px;margin:10px 0 6px;color:var(--ink);text-decoration:none;box-shadow:var(--shadow)}
 .fclink .fcico{width:46px;height:30px;flex:none;color:var(--slate);--fish-eye:#fff}.fclink .fcico svg{width:100%;height:100%}
 .fclink .small{color:var(--muted)}.fclink .fcgo{margin-left:auto;font-size:1.6rem;color:var(--sea);line-height:1}
-.tie{position:fixed;inset:0;z-index:90;background:var(--paper);display:flex;flex-direction:column;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.tie{position:fixed;inset:0;z-index:2000;background:var(--paper);display:flex;flex-direction:column;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
 .tie-top{background:var(--navy);color:#fff;padding:12px 16px 10px;position:relative}
 .tie-name{font:800 1.05rem var(--head);padding-right:40px}.tie-x{position:absolute;right:10px;top:8px;background:none;border:0;color:#fff;font-size:1.4rem;padding:6px 10px;cursor:pointer}
 .tie-bar{height:5px;background:rgba(255,255,255,.18);border-radius:5px;margin-top:10px;overflow:hidden}.tie-bar i{display:block;height:100%;background:var(--cream);border-radius:5px;transition:width .25s}
@@ -90,10 +90,11 @@ ol.steps img{width:100%;border-radius:10px;margin-top:8px}
 .tie-k{font:800 .8rem var(--head);letter-spacing:.08em;text-transform:uppercase;color:var(--slate);margin-bottom:8px}
 .tie-body h2{font:800 1.6rem var(--head);margin:0 0 12px}.tie-txt{font-size:1.45rem;line-height:1.45;margin:0 0 16px}.tie-sub{font-size:1.1rem;text-align:center;color:var(--muted)}
 .tie-img{width:100%;max-height:42vh;object-fit:contain;border-radius:16px;background:#111;margin-bottom:14px}
+.tie-ref{margin:0 0 16px;display:flex;align-items:center;gap:12px}.tie-ref img{width:46%;max-width:240px;aspect-ratio:16/9;object-fit:cover;border-radius:12px;background:#111}.tie-ref figcaption{font-size:.85rem;color:var(--muted)}
 .tie-mats{list-style:none;padding:0;margin:0}.tie-mats li{padding:10px 0;border-bottom:1px solid var(--line);font-size:1.1rem}.tie-mats label{display:flex;gap:12px;align-items:flex-start;color:var(--ink);font-size:inherit;margin:0}.tie-mats input{width:22px;height:22px;margin-top:3px;flex:none;accent-color:var(--navy)}
 .tie-done{width:96px;height:96px;margin:30px auto 10px;color:var(--slate)}.tie-done svg{width:100%;height:100%}.tie-body h2:has(+.tie-sub){text-align:center}
 .tie-nav{display:flex;gap:10px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--card)}.tie-nav .btn{flex:1;font-size:1.05rem;padding:14px}
-.welcome{position:fixed;inset:0;z-index:95;background:rgba(24,34,65,.72);display:flex;align-items:center;justify-content:center;padding:20px}
+.welcome{position:fixed;inset:0;z-index:2001;background:rgba(24,34,65,.72);display:flex;align-items:center;justify-content:center;padding:20px}
 .wcard{background:var(--paper);border-radius:28px;padding:28px 24px 22px;max-width:380px;width:100%;text-align:center;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.35)}
 .wskip{position:absolute;right:14px;top:12px;background:none;border:0;color:var(--muted);font:700 .9rem var(--body);cursor:pointer;padding:6px}
 .wico{width:110px;height:110px;border-radius:50%;background:var(--navy);color:var(--cream);margin:6px auto 16px;display:flex;align-items:center;justify-content:center}.wico svg{width:56px;height:56px}.wico .wfish svg{width:78px;height:50px}.wico .wfish{--fish-eye:var(--navy);display:flex}
@@ -589,8 +590,8 @@ async function tieMode(f){
   const draw=()=>{ const pg=pages[at];
     let body="";
     if(pg.kind==="mats") body=`<div class="tie-k">Before you start</div><h2>Get these on your bench</h2><ul class="tie-mats">${mats.map(m=>{ const st=matStatus(m); return `<li><label><input type="checkbox"> <span>${st?`<span class="dot ${st}"></span>`:""}<b>${esc(m.part||"")}</b>${m.part?": ":""}${esc(m.material_text)}</span></label></li>`; }).join("")}</ul>`;
-    else if(pg.kind==="step"){ const st=pg.st, ph=st.photo_path?flyPhotoUrl(st.photo_path):null;
-      body=`<div class="tie-k">Step ${pg.i+1} of ${steps.length}</div>${ph?`<img class="tie-img" src="${ph}" alt="">`:""}<p class="tie-txt">${esc(st.instruction)}</p>${st.youtube_url?`<a class="btn alt sm" href="${esc(ytWatchUrl(st.youtube_url))}" target="_blank" rel="noopener">▶ Watch this step</a>`:""}`; }
+    else if(pg.kind==="step"){ const st=pg.st, ph=st.photo_path?flyPhotoUrl(st.photo_path):null, ref=flyPhotoUrl(f.cover_photo_path)||commonsUrl(f.photo_url,800);
+      body=`<div class="tie-k">Step ${pg.i+1} of ${steps.length}</div>${ph?`<img class="tie-img" src="${ph}" alt="">`:ref?`<figure class="tie-ref"><img src="${ref}" alt=""><figcaption>What you're tying</figcaption></figure>`:""}<p class="tie-txt">${esc(st.instruction)}</p>${st.youtube_url?`<a class="btn alt sm" href="${esc(ytWatchUrl(st.youtube_url))}" target="_blank" rel="noopener">▶ Watch this step</a>`:""}`; }
     else body=`<div class="tie-done">${FLY_ICON}</div><h2>Nice tie!</h2><p class="tie-sub">Your ${esc(f.name)} is ready. Snap a photo, then go catch something with it.</p><div class="row" style="justify-content:center;gap:10px;flex-wrap:wrap"><button class="btn" id="tLog">Log a catch</button><button class="btn alt" id="tAgain">Tie another</button></div>`;
     o.innerHTML=`<div class="tie-top"><button class="tie-x" aria-label="Close">✕</button><div class="tie-name">${esc(f.name)}</div><div class="tie-bar"><i style="width:${Math.round(at/(pages.length-1)*100)}%"></i></div></div>
       <div class="tie-body">${body}</div>
