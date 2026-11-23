@@ -740,7 +740,7 @@ function pickMaterial({ title, barcode=null, prefill={}, lookup=null, onPick }){
   const found = lookup && lookup.found;
   const s=sheet(`<h2>${esc(title)}</h2>${barcode?`<p class="small muted">Barcode ${esc(barcode)} isn't in Fly Bench yet. Name it once and it's saved for everyone.</p>`:""}
     ${found?`<div class="card rules" style="padding:10px;margin-bottom:8px"><div class="small muted">Found online</div><b>${esc(lookup.source_title||lookup.name)}</b><div class="small muted" style="margin-top:4px">We filled in the details below. Check them (online listings can be off), pick a match if it's already in the app, or tap Create & add.</div></div>`
-      : lookup && lookup.message ? `<p class="small muted">${esc(lookup.message)}</p>` : lookup ? `<p class="small muted">No match online either, so please name it below.</p>` : ""}
+      : barcode ? `<div class="card rules" style="padding:10px;margin-bottom:8px"><b>✓ Barcode read</b><div class="small muted" style="margin-top:4px">${lookup && lookup.message ? esc(lookup.message) : "This product isn't in the online barcode databases yet."} Search below in case it's already in the app, or type its name, brand and color once. Then it's recognized for everyone.</div></div>` : ""}
     <input type="search" id="mq" placeholder="Search materials already in the app…" value="${esc(prefill.name||"")}">
     <div id="mres" style="margin:8px 0"></div>
     <div class="card"><h3>Or create a new material</h3>
@@ -810,6 +810,7 @@ async function openScanner(){
     code = window.FBScan ? FBScan.normalize(code) : String(code||"").trim(); if(!code) return;
     const now=Date.now(); if(scanState.busy || (code===scanState.last && now-scanState.lastT<2500)) return;
     scanState.busy=true; scanState.last=code; scanState.lastT=now; navigator.vibrate?.(60);
+    $("#scanMsg",el).innerHTML=`✓ Read ${esc(code)}. Checking…`;
     const { data } = await sb.from("material_barcodes").select("material:materials(*)").eq("barcode", code).maybeSingle();
     const done = async m => {
       if(scanState.mode==="haul"){ const v=scanState.haul.get(m.id)||{name:m.name,n:0}; v.n++; scanState.haul.set(m.id,v); drawHaul(); $("#scanMsg",el).textContent=`Added to haul: ${m.name}`; }
@@ -818,12 +819,13 @@ async function openScanner(){
     };
     if(data?.material) await done(data.material);
     else {
-      $("#scanMsg",el).innerHTML=`<span class="spinner"></span> New barcode. Looking it up online…`;
+      $("#scanMsg",el).innerHTML=`<span class="spinner"></span> ✓ Read ${esc(code)}. Looking it up online…`;
       const lookup = await lookupUPC(code); slog("lookup", { found:!!lookup?.found, reason:lookup?.reason||null, gotReply:!!lookup });
       const prefill = lookup?.found ? { name:lookup.name, brand:lookup.brand, color:lookup.color, size:lookup.size, category:lookup.category } : {};
       const s=pickMaterial({ title: lookup?.found ? "Is this it?" : "New barcode", barcode:code, prefill, lookup, onPick:done });
       s.style.zIndex=70; s.addEventListener("click",e=>{ if(e.target===s) scanState.busy=false; });
-      $("#scanMsg",el).textContent="Point the camera at the barcode on the package."; }
+      $("#scanMsg",el).innerHTML=`✓ Read ${esc(code)}. Fill in the form to save it.`;
+      s.addEventListener("click",e=>{ if(e.target===s) $("#scanMsg",el).textContent="Point the camera at the barcode on the package."; }); }
   }
   try{
     const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment", width:{ideal:1280}, height:{ideal:720} } });
@@ -834,7 +836,7 @@ async function openScanner(){
     if(!window.FBScan){ $("#scanMsg",el).textContent="Barcode reader didn't load. Tap “📸 Photo” or “Type code”."; return; }
     const stopRead = FBScan.start(video, (code, err)=>{
       if(err){ slog("reader_err", { msg:String(err.message).slice(0,200) }); $("#scanMsg",el).textContent = err.message+" You can also tap “📸 Photo”."; return; }
-      slog("code", { code }); handleCode(code); }, i=>{ const n=$("#scanInfo",el); if(n) n.textContent=`${i.mode} · camera ${i.size} · checked ${i.frames} frames`;
+      if(!scanState || scanState.busy) return; slog("code", { code }); handleCode(code); }, i=>{ const n=$("#scanInfo",el); if(n) n.textContent=`${i.mode} · camera ${i.size} · checked ${i.frames} frames`;
         if(i.frames===1 || (i.frames>0 && i.frames%40===0) || (i.frames===0 && !el._z0)){ if(i.frames===0) el._z0=1; slog("frames", i); } });
     const prevStop = scanState.stop; scanState.stop = ()=>{ stopRead(); prevStop(); };
   }catch(err){ console.error(err); slog("camera_err", { name:err.name, msg:String(err.message).slice(0,200) }); $("#scanMsg",el).textContent="Camera unavailable. Allow camera access for this site, or tap “📸 Photo” or “Type code”."; }
