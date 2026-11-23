@@ -108,6 +108,9 @@ ol.steps img{width:100%;border-radius:10px;margin-top:8px}
 .sheet .grab{width:40px;height:4px;background:var(--line);border-radius:4px;margin:0 auto 10px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;z-index:80;font-size:.9rem;max-width:90vw;text-align:center}
 #scanner{position:fixed;inset:0;z-index:60;background:#000;display:flex;flex-direction:column}
+.deskpair{display:flex;gap:14px;align-items:flex-start}.qrbox{width:150px;min-width:150px;height:150px;background:#fff;border-radius:10px;padding:6px;display:grid;place-items:center}.qrbox svg{width:100%;height:100%}
+.sheet.desk>div{max-width:720px}.deskit{padding:10px 12px;margin-bottom:8px}.deskit.done{opacity:.8}.deskit.new{border-left:4px solid var(--brass)}.deskit .row{gap:6px;margin-top:6px;align-items:center}.deskit input,.deskit select{margin:0}
+@media (pointer:coarse) and (max-width:700px){.desk-only{display:none}}
 #scanner video{flex:1;width:100%;object-fit:cover}
 #scanner .frame{position:absolute;left:10%;right:10%;top:35%;height:22%;border:3px solid var(--brass);border-radius:12px;box-shadow:0 0 0 2000px rgba(0,0,0,.35)}
 #scanner .bar{position:absolute;left:0;right:0;bottom:0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));background:linear-gradient(transparent,rgba(0,0,0,.85));color:#fff}
@@ -813,6 +816,7 @@ async function renderInventory(){
     <div class="row" style="margin-bottom:10px">
       <button class="btn brass grow" id="scanBtn">📷 Scan barcode</button>
       <button class="btn alt" id="rcptBtn">🧾 Receipt</button>
+      <button class="btn alt desk-only" id="deskBtn" title="Scan with your phone, review and type here">📱 Scan with phone</button>
     </div>
     ${pendingBuys().length?`<div class="card row pendcard" id="pendC" style="padding:10px 12px"><span class="grow">🛒 Bought anything? ${pendingBuys().length} item${pendingBuys().length>1?"s":""} waiting to add.</span><button class="btn sm">Add to bench</button></div>`:""}
     <input type="search" id="iq" placeholder="Search your materials…" value="${esc(invQ)}">
@@ -829,6 +833,7 @@ async function renderInventory(){
   $("#scanBtn").onclick=()=>openScanner();
   if($("#emScan")) $("#emScan").onclick=()=>openScanner();
   $("#rcptBtn").onclick=()=>openReceipt();
+  if($("#deskBtn")) $("#deskBtn").onclick=()=>openDeskScan();
   view.querySelectorAll("[data-inc]").forEach(b=>b.onclick=async e=>{ e.stopPropagation(); await adjust(+b.dataset.mat, +b.dataset.inc, "manual"); renderInventory(); });
   view.querySelectorAll("[data-inv]").forEach(r=>r.onclick=()=>editInvItem(S.inventory.find(i=>i.id===+r.dataset.inv)));
   fab("+ Add material", ()=>{ const s=pickMaterial({ title:"Add material", onPick: async m => { await adjust(m.id, 1, "manual"); toast(`Added ${m.name}`); renderInventory(); } });
@@ -1010,13 +1015,18 @@ async function openScanner(){
     <div class="bar"><div class="modes"><span class="chip on" data-mode="add">Bought (+1)</span><span class="chip" data-mode="use">Used up (−1)</span><span class="chip" data-mode="haul">Haul mode</span></div>
     <div id="scanMsg" class="small">Point the camera at the barcode on the package.</div>
     <div id="scanInfo" class="small" style="opacity:.6;font-size:.72rem;margin-top:2px"></div>
+    <div id="pairBar" class="small hide" style="margin:2px 0 6px"><label style="display:flex;gap:8px;align-items:center;margin:0;color:#fff"><input type="checkbox" id="toDesk" checked style="width:auto"> 💻 Send to my computer</label></div>
     <div id="haulList" class="small" style="margin-top:6px"></div>
     <div class="row" style="margin-top:10px"><button class="btn alt grow" id="photoCode">📸 Photo</button><button class="btn alt grow" id="manualCode">Type code</button><button class="btn brass grow hide" id="haulSave">Save haul</button><button class="btn grow" id="scanDone">Done</button></div></div>`;
   document.body.appendChild(el);
   const video=$("video",el);
   scanState = { mode:"add", busy:false, last:"", lastT:0, haul:new Map(), stop:null };
   el.querySelectorAll("[data-mode]").forEach(c=>c.onclick=()=>{ scanState.mode=c.dataset.mode; el.querySelectorAll("[data-mode]").forEach(x=>x.classList.toggle("on",x===c)); $("#haulSave",el).classList.toggle("hide", scanState.mode!=="haul"); });
-  const close = () => { scanState?.stop?.(); el.remove(); scanState=null; if(S.tab==="inventory") renderInventory(); };
+  const pairL = ev => { if(!scanState) return;
+    if(ev.type==="peers"){ $("#pairBar",el).classList.toggle("hide", !pairPeers.desk); }
+    if(ev.type==="ack" && ev.code===scanState.sentCode){ $("#scanMsg",el).textContent = "💻 " + ev.text; scanState.busy=false; } };
+  if(S.user && !DEMO){ pairListeners.add(pairL); pairJoin("phone").then(()=>pairL({ type:"peers" })); }
+  const close = () => { scanState?.stop?.(); el.remove(); scanState=null; pairListeners.delete(pairL); if(pairRole==="phone") pairLeave(); if(S.tab==="inventory") renderInventory(); };
   $("#scanDone",el).onclick=close;
   $("#manualCode",el).onclick=()=>{ const c=prompt("Enter the barcode number"); if(c) handleCode(c.replace(/\D/g,"")); };
   $("#photoCode",el).onclick=()=>{ const f=document.createElement("input"); f.type="file"; f.accept="image/*"; f.capture="environment";
@@ -1030,6 +1040,11 @@ async function openScanner(){
     code = window.FBScan ? FBScan.normalize(code) : String(code||"").trim(); if(!code) return;
     const now=Date.now(); if(scanState.busy || (code===scanState.last && now-scanState.lastT<2500)) return;
     scanState.busy=true; scanState.last=code; scanState.lastT=now; navigator.vibrate?.(60);
+    if(pairPeers.desk && $("#toDesk",el)?.checked){ // hand it to the computer, which looks it up and answers
+      scanState.sentCode=code; $("#scanMsg",el).textContent=`✓ ${code} sent to your computer…`;
+      const r = await pairSend("scan", { code, from:"phone" });
+      if(r!=="ok"){ $("#scanMsg",el).textContent="Couldn't reach your computer — saving here instead."; } else { setTimeout(()=>{ if(scanState && scanState.sentCode===code) scanState.busy=false; }, 1500); return; }
+    }
     $("#scanMsg",el).innerHTML=`✓ Read ${esc(code)}. Checking…`;
     const { data } = await sb.from("material_barcodes").select("material:materials(*)").eq("barcode", code).maybeSingle();
     const done = async m => {
@@ -1069,6 +1084,130 @@ async function openScanner(){
       if(!scanState || scanState.busy) return; handleCode(code); }, i=>{ const n=$("#scanInfo",el); if(n) n.textContent=`${i.mode} · camera ${i.size} · checked ${i.frames} frames`; });
     const prevStop = scanState.stop; scanState.stop = ()=>{ stopRead(); prevStop(); };
   }catch(err){ console.error(err); $("#scanMsg",el).textContent="Camera unavailable. Allow camera access for this site, or tap “📸 Photo” or “Type code”."; }
+}
+
+/* ---- phone ↔ computer: scan on the phone, review and type on the computer ----
+   Both devices signed in to the same account join a private realtime channel (fbscan:<user id>).
+   The computer ("desk") shows a QR code and a review list; the phone's scanner sends each code there,
+   and the computer replies with what it found so the phone can show it. A USB/Bluetooth barcode scanner
+   plugged into the computer works in the same list. */
+let pairCh = null, pairRole = null, pairPeers = { desk:0, phone:0 }, pairListeners = new Set();
+async function pairJoin(role){
+  if(DEMO || !S.user) return null;
+  if(pairCh && pairRole===role) return pairCh;
+  pairLeave();
+  try{ await sb.realtime.setAuth(); }catch(e){}
+  pairRole = role;
+  const ch = sb.channel("fbscan:"+S.user.id, { config:{ private:true, broadcast:{ self:false, ack:true }, presence:{ key: role+"-"+Math.random().toString(36).slice(2,8) } } });
+  ch.on("presence", { event:"sync" }, ()=>{ const st=ch.presenceState(); pairPeers={ desk:0, phone:0 }; Object.values(st).flat().forEach(p=>{ if(p.role in pairPeers) pairPeers[p.role]++; }); pairListeners.forEach(f=>f({ type:"peers" })); });
+  ch.on("broadcast", { event:"scan" }, ({ payload })=>pairListeners.forEach(f=>f({ type:"scan", ...payload })));
+  ch.on("broadcast", { event:"ack" }, ({ payload })=>pairListeners.forEach(f=>f({ type:"ack", ...payload })));
+  await new Promise(res=>{ const t=setTimeout(res, 6000); ch.subscribe(async st=>{ if(st==="SUBSCRIBED"){ clearTimeout(t); await ch.track({ role, at:Date.now(), device: /iPhone|iPad|Android/i.test(navigator.userAgent)?"phone":"computer" }); res(); } else if(st==="CHANNEL_ERROR"||st==="TIMED_OUT"){ clearTimeout(t); res(); } }); });
+  pairCh = ch; return ch;
+}
+function pairLeave(){ if(pairCh){ try{ sb.removeChannel(pairCh); }catch(e){} } pairCh=null; pairRole=null; pairPeers={ desk:0, phone:0 }; }
+function pairSend(event, payload){ return pairCh ? pairCh.send({ type:"broadcast", event, payload }) : Promise.resolve("no-channel"); }
+
+let qrLib = null;
+function loadQR(){ return qrLib ||= new Promise((ok,no)=>{ if(window.qrcode) return ok(window.qrcode); const s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"; s.onload=()=>ok(window.qrcode); s.onerror=()=>{ qrLib=null; no(); }; document.head.appendChild(s); }); }
+
+async function openDeskScan(){
+  if(!S.user) return openAuth();
+  const url = location.origin + "/#phonescan";
+  const s = sheet(`<h2>📱 Scan with your phone</h2>
+    <div class="deskpair"><div id="qrBox" class="qrbox"><span class="spinner"></span></div>
+      <div class="grow"><p class="small" style="margin-top:0">On your phone, scan this code with the camera — or open <b>${esc(location.host)}</b>, sign in as <b>${esc(S.user.email||"you")}</b>, and tap <b>📷 Scan barcode</b>. Every barcode you scan shows up here to check and edit with a keyboard.</p>
+      <div id="pairSt" class="small muted">Connecting…</div></div></div>
+    <div class="chips" style="margin:10px 0 6px"><span class="chip on" data-dm="add">Bought (+)</span><span class="chip" data-dm="use">Used up (−)</span><span class="chip" data-dm="review">Review first</span></div>
+    <p class="small muted" id="dmHelp" style="margin:0 0 8px"></p>
+    <input type="text" id="deskCode" inputmode="numeric" autocomplete="off" placeholder="USB/Bluetooth scanner or type a barcode, then Enter">
+    <div id="deskList" style="margin-top:10px"></div>
+    <div class="row" style="margin-top:10px"><button class="btn brass grow hide" id="deskSaveAll">Save all</button><button class="btn alt grow" id="deskDone">Done</button></div>`);
+  s.classList.add("desk");
+  const box = s.firstElementChild;
+  const items = []; // { key, code, n, status:'checking'|'known'|'new'|'saved'|'error', material, lookup, form }
+  let mode = "add", review = false;
+  const help = () => { $("#dmHelp",s).textContent = review ? `Scans collect in the list below — adjust counts, fill in new items, then “Save all”.` : `Known items are ${mode==="use"?"taken off":"added to"} your bench the moment they're scanned; new ones wait below for you to name them.`; };
+  help();
+  s.querySelectorAll("[data-dm]").forEach(c=>c.onclick=()=>{ const v=c.dataset.dm; if(v==="review"){ review=!review; c.classList.toggle("on",review); } else { mode=v; s.querySelectorAll('[data-dm="add"],[data-dm="use"]').forEach(x=>x.classList.toggle("on",x.dataset.dm===mode)); } help(); draw(); });
+  loadQR().then(q=>{ const qr=q(0,"M"); qr.addData(url); qr.make(); $("#qrBox",s).innerHTML=qr.createSvgTag({ cellSize:4, margin:2, scalable:true }); }, ()=>{ $("#qrBox",s).innerHTML=`<div class="small">${esc(url)}</div>`; });
+  const status = () => { const n=pairPeers.phone; $("#pairSt",s).innerHTML = !pairCh ? `<span class="need">Couldn't connect — check your connection and reopen.</span>` : n ? `<b style="color:var(--moss,#2f7d4f)">● ${n>1?n+" phones":"Phone"} connected</b> — start scanning.` : `○ Waiting for your phone…`; };
+  const listener = ev => { if(ev.type==="peers") status(); if(ev.type==="scan") addCode(ev.code, ev.from||"phone"); };
+  pairListeners.add(listener);
+  await pairJoin("desk"); status();
+  const beep = () => { try{ const a=new (window.AudioContext||window.webkitAudioContext)(), o=a.createOscillator(), g=a.createGain(); o.frequency.value=1250; g.gain.value=.06; o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime+.09); }catch(e){} };
+
+  async function addCode(raw, from){
+    const code = window.FBScan ? FBScan.normalize(raw) : String(raw||"").trim(); if(!/^\d{6,14}$|^[A-Za-z0-9\-]{4,30}$/.test(code)) return;
+    beep();
+    const same = items.find(x=>x.code===code && x.status!=="saved");
+    if(same){ same.n++; draw(); if(!review && same.status==="known") return applyNow(same); ack(code, same); return; }
+    const it = { key:Math.random().toString(36).slice(2), code, n:1, status:"checking", from };
+    items.unshift(it); draw();
+    const { data } = await sb.from("material_barcodes").select("material:materials(*)").eq("barcode", code).maybeSingle();
+    if(data?.material){ it.material=data.material; it.status="known"; }
+    else { it.lookup = await lookupUPC(code); const L=it.lookup?.found?it.lookup:{}; it.form={ name:L.name||"", brand:L.brand||"", color:L.color||"", size:L.size||"", category:CATEGORIES.includes(L.category)?L.category:"other" }; it.status="new"; }
+    draw();
+    if(!review && it.status==="known") await applyNow(it); else ack(code, it);
+  }
+  async function applyNow(it){
+    try{ const q = await adjust(it.material.id, mode==="use"?-it.n:it.n, mode==="use"?"use":"scan"); it.done=(it.done||0)+it.n; it.n=0; it.qty=q; it.status="saved"; it.status="known-applied"; draw(); ack(it.code, it); }
+    catch(e){ it.status="error"; it.err=e.message; draw(); }
+  }
+  function ack(code, it){
+    const text = it.status==="known-applied" ? `${mode==="use"?"Used":"Added"} ${matLabel(it.material)} — now ${fmtQty(it.qty)}`
+      : it.status==="known" ? `${matLabel(it.material)} ×${it.n} — in the list on your computer`
+      : it.status==="new" ? (it.lookup?.found ? `New: ${it.form.name} — check it on your computer` : `New barcode — name it on your computer`)
+      : it.status==="saved" ? `Saved ${it.material?matLabel(it.material):""}` : "Got it";
+    pairSend("ack", { code, text });
+  }
+  function row(it){
+    const head = `<div class="small muted">${esc(it.code)}${it.from==="keyboard"?" · scanner":" · phone"}</div>`;
+    if(it.status==="checking") return `<div class="card deskit">${head}<span class="spinner"></span> Looking it up…</div>`;
+    if(it.status==="error") return `<div class="card deskit">${head}<span class="need">${esc(it.err||"Couldn't save")}</span></div>`;
+    if(it.status==="known-applied"||it.status==="saved") return `<div class="card deskit done">${head}<b>✓ ${esc(matLabel(it.material))}</b> <span class="small muted">${it.qty!=null?"now "+fmtQty(it.qty):""}</span> <button class="btn sm alt" data-undo="${it.key}">Undo</button></div>`;
+    const qty = `<label class="small" style="margin:0">Qty</label><input type="number" min="1" step="1" value="${it.n}" data-n="${it.key}" style="width:70px">`;
+    if(it.status==="known") return `<div class="card deskit">${head}<div class="row"><div class="grow"><b>${esc(matLabel(it.material))}</b></div>${qty}<button class="btn sm" data-one="${it.key}">Save</button><button class="btn sm alt" data-x="${it.key}">✕</button></div></div>`;
+    const f = it.form, L = it.lookup;
+    return `<div class="card deskit new">${head}${L?.found?`<div class="small">Found online: <b>${esc(L.source_title||L.name)}</b> — check the details.</div>`:`<div class="small">${esc(L?.message||"Not in the barcode databases yet.")} Name it once and it's recognized for everyone.</div>`}
+      <div class="row"><input data-f="name" data-k="${it.key}" value="${esc(f.name)}" placeholder="Name (Ice Dub, Bucktail…)" class="grow"><input data-f="brand" data-k="${it.key}" value="${esc(f.brand)}" placeholder="Brand" style="width:28%"></div>
+      <div class="row"><input data-f="color" data-k="${it.key}" value="${esc(f.color)}" placeholder="Color" class="grow"><input data-f="size" data-k="${it.key}" value="${esc(f.size)}" placeholder="Size" style="width:22%"><select data-f="category" data-k="${it.key}" style="width:30%">${CATEGORIES.map(c=>`<option value="${c}" ${f.category===c?"selected":""}>${CAT_LABEL[c]}</option>`).join("")}</select></div>
+      <div class="row">${qty}<span class="grow"></span><button class="btn sm alt" data-match="${it.key}">Already in the app?</button><button class="btn sm" data-one="${it.key}">Create & add</button><button class="btn sm alt" data-x="${it.key}">✕</button></div></div>`;
+  }
+  function draw(){
+    const pending = items.filter(x=>x.status==="known"||x.status==="new");
+    $("#deskList",s).innerHTML = items.length ? items.map(row).join("") : `<p class="small muted">Nothing scanned yet.</p>`;
+    $("#deskSaveAll",s).classList.toggle("hide", pending.length<2);
+    $("#deskSaveAll",s).textContent = `Save all (${pending.length})`;
+  }
+  async function saveOne(it){
+    if(it.status==="new"){
+      const f=it.form; if(!f.name.trim()){ toast("Give it a name first"); return false; }
+      const { data:m, error } = await sb.from("materials").insert({ name:f.name.trim(), brand:f.brand.trim()||null, color:f.color.trim()||null, size:f.size.trim()||null, category:f.category }).select().single();
+      if(error){ toast(error.message); return false; }
+      await saveBarcode(it.code, m.id); it.material=m;
+    }
+    try{ it.qty = await adjust(it.material.id, mode==="use"?-it.n:it.n, mode==="use"?"use":"scan"); it.done=it.n; it.status="saved"; ack(it.code, it); return true; }
+    catch(e){ return false; }
+  }
+  const find = k => items.find(x=>x.key===k);
+  $("#deskList",s).addEventListener("input", e=>{ const t=e.target; if(t.dataset.n){ const it=find(t.dataset.n); if(it) it.n=Math.max(1,parseInt(t.value)||1); } if(t.dataset.f){ const it=find(t.dataset.k); if(it) it.form[t.dataset.f]=t.value; } });
+  $("#deskList",s).addEventListener("change", e=>{ const t=e.target; if(t.dataset.f){ const it=find(t.dataset.k); if(it) it.form[t.dataset.f]=t.value; } });
+  $("#deskList",s).addEventListener("click", async e=>{
+    const b=e.target.closest("button"); if(!b) return;
+    if(b.dataset.x){ items.splice(items.indexOf(find(b.dataset.x)),1); draw(); }
+    if(b.dataset.one){ b.disabled=true; await saveOne(find(b.dataset.one)); draw(); }
+    if(b.dataset.undo){ const it=find(b.dataset.undo); if(it?.material && it.done){ try{ it.qty=await adjust(it.material.id, mode==="use"?it.done:-it.done, "undo"); toast("Undone"); items.splice(items.indexOf(it),1); draw(); }catch(e){} } }
+    if(b.dataset.match){ const it=find(b.dataset.match); const p=pickMaterial({ title:"Find it in the app", barcode:it.code, prefill:{ ...it.form }, lookup:it.lookup, onPick:m=>{ it.material=m; it.status="known"; draw(); ack(it.code,it); } }); p.style.zIndex=80; }
+  });
+  $("#deskSaveAll",s).onclick=async()=>{ const b=$("#deskSaveAll",s); b.disabled=true; let n=0; for(const it of items.filter(x=>x.status==="known"||x.status==="new")) if(await saveOne(it)) n++; b.disabled=false; draw(); toast(`Saved ${n} item${n===1?"":"s"}`); };
+  // keyboard-wedge scanners type digits fast and press Enter
+  $("#deskCode",s).addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); const v=e.target.value.replace(/\s/g,""); e.target.value=""; if(v) addCode(v, "keyboard"); } });
+  setTimeout(()=>$("#deskCode",s)?.focus(), 300);
+  const close = () => { pairListeners.delete(listener); pairLeave(); if(S.tab==="inventory") renderInventory(); };
+  $("#deskDone",s).onclick=()=>s.remove();
+  new MutationObserver((_,o)=>{ if(!s.isConnected){ o.disconnect(); close(); } }).observe(document.body,{ childList:true });
+  draw();
 }
 
 /* ---- receipt reader ---- */
@@ -1300,6 +1439,7 @@ sb.auth.onAuthStateChange((evt)=>{ if(evt==="SIGNED_IN"||evt==="SIGNED_OUT") aft
   if(wantDelete){ history.replaceState(null,"",location.pathname); if(S.user) openAccount(); else { S.pendingAccount=true; openAuth(); } }
   if(location.hash==="#subscribe"){ history.replaceState(null,"",location.pathname); openSubscribe(); }
   if(location.hash==="#rules"){ history.replaceState(null,"",location.pathname); openNearbyRules(); }
+  if(location.hash==="#phonescan"){ history.replaceState(null,"",location.pathname); if(S.user) setTimeout(()=>openScanner(), 300); else { toast("Sign in, then tap 📷 Scan barcode"); openAuth(); } }
   const hfly = location.hash.match(/^#(?:fly|tie)=(\d+)/), hfish = (location.hash.match(/^#fish=([a-z0-9-]+)/)||[])[1] || new URLSearchParams(location.search).get("fish");
   if(hfish){ const sp=S.species.find(x=>spSlug(x.common_name)===hfish || FC_SP[x.id]===hfish); if(sp){ S.flyFilter={...S.flyFilter, species:String(sp.id)}; S.tab="flies"; } history.replaceState(null,"",location.pathname); }
   const wantNew = location.hash==="#new";
