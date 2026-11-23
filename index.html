@@ -141,6 +141,16 @@ body:has(.sheet) #ft-btn, body:has(#scanner) #ft-btn{display:none!important} /* 
 .banner p{margin:4px 0 0;font-size:.95rem;opacity:.92}
 .banner .btn{align-self:flex-start;margin-top:12px;background:var(--cream);color:var(--slate)}
 @media(min-width:760px){.banner{margin:0 0 14px;border-radius:var(--r)}}
+.fishpick{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x proximity;padding:4px 2px 10px;margin:0 -14px;padding-left:14px;padding-right:14px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.fishpick::-webkit-scrollbar{display:none}
+.fishchip{flex:none;scroll-snap-align:start;width:78px;border:1px solid var(--line);background:var(--card);border-radius:16px;padding:8px 4px 7px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--slate);font:600 .74rem/1.15 var(--body);cursor:pointer;transition:transform .12s,background .15s;--fish-eye:var(--card)}
+.fishchip:active{transform:scale(.95)}
+.fishchip .fico{width:58px;height:29px;display:grid;place-items:center}
+.fishchip .fico svg{width:100%;height:100%}
+.fishchip .fico.all svg{width:26px;height:26px}
+.fishchip span:last-child{max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fishchip.on{background:var(--navy);border-color:var(--navy);color:var(--cream);--fish-eye:var(--navy)}
+@media(min-width:760px){.fishpick{margin:0;padding-left:2px;padding-right:2px;flex-wrap:wrap;overflow:visible}}
 .flycard.big{display:block;padding:0;overflow:hidden}
 .flycard.big .pic{position:relative;aspect-ratio:16/9;background:var(--cream) center/cover no-repeat;display:grid;place-items:center;color:var(--sea)}
 .flycard.big .pic svg{width:54px;height:54px}
@@ -339,7 +349,7 @@ function matStatus(fm){
   if(fm.category && stocked.some(i => i.material.category === fm.category)) return "maybe";
   return "need";
 }
-function canTie(f){ if(!S.user) return false; return (f.fly_materials||[]).every(m => matStatus(m) !== "need"); }
+function canTie(f){ if(!S.user) return false; const mats=f.fly_materials||[]; return mats.length>0 && mats.every(m => matStatus(m) !== "need"); }
 
 /* ---------------- auth ---------------- */
 async function refreshUser(){
@@ -425,7 +435,16 @@ function fab(label, fn){ const b=document.createElement("button"); b.className="
 async function renderFlies(){
   if(!S.flies){ view.innerHTML=`<div class="empty"><span class="spinner"></span></div>`; await loadFlies(); }
   const F = S.flyFilter;
-  const spOpts = S.species.map(s=>`<option value="${s.id}" ${String(F.species)===String(s.id)?"selected":""}>${esc(s.common_name)}</option>`).join("");
+  // Species picker: tappable fish, most-tied species first, limited to the chosen water type.
+  const flyCount = {}; S.flies.forEach(f=>(f.fly_species||[]).forEach(x=>{ flyCount[x.species_id]=(flyCount[x.species_id]||0)+1; }));
+  const spList = S.species.filter(s=>flyCount[s.id] && (!F.water || !s.water_type || s.water_type===F.water || String(F.species)===String(s.id)))
+    .sort((a,b)=>(flyCount[b.id]-flyCount[a.id]) || a.common_name.localeCompare(b.common_name));
+  const fishSvg = n => window.FBFish ? FBFish.svg(n) : "";
+  const fishName = n => window.FBFish ? FBFish.short(n) : n;
+  const spPicker = `<div class="fishpick" id="fsp" role="listbox" aria-label="Choose a fish">
+      <button type="button" class="fishchip ${!F.species?"on":""}" data-sp="" role="option" aria-selected="${!F.species}"><span class="fico all">${FLY_ICON}</span><span>All fish</span></button>
+      ${spList.map(s=>`<button type="button" class="fishchip ${String(F.species)===String(s.id)?"on":""}" data-sp="${s.id}" role="option" aria-selected="${String(F.species)===String(s.id)}" title="${esc(s.common_name)}"><span class="fico">${fishSvg(s.common_name)}</span><span>${esc(fishName(s.common_name))}</span></button>`).join("")}
+    </div>`;
   let list = S.flies.filter(f => {
     if(F.species && !(f.fly_species||[]).some(x=>String(x.species_id)===String(F.species))) return false;
     if(F.water && !(f.water_type===F.water || f.water_type==="both")) return false;
@@ -438,8 +457,8 @@ async function renderFlies(){
   view.innerHTML = banner + `
     <input type="search" id="fq" placeholder="Search flies…" value="${esc(F.q)}">
     <div style="height:8px"></div>
-    <select id="fsp"><option value="">All species</option>${spOpts}</select>
-    <div class="chips" style="margin-top:8px">
+    ${spPicker}
+    <div class="chips" style="margin-top:4px">
       <span class="chip ${!F.water?"on":""}" data-w="">All water</span>
       <span class="chip ${F.water==="salt"?"on":""}" data-w="salt">Saltwater</span>
       <span class="chip ${F.water==="fresh"?"on":""}" data-w="fresh">Freshwater</span>
@@ -450,7 +469,9 @@ async function renderFlies(){
   if($("#bnSign")) $("#bnSign").onclick=openAuth;
   if($("#fClear")) $("#fClear").onclick=()=>{ Object.assign(F,{q:"",species:"",water:"",canTie:false,mine:false}); renderFlies(); };
   $("#fq").oninput = e => { F.q=e.target.value; clearTimeout(renderFlies.t); renderFlies.t=setTimeout(()=>{ renderFlies().then(()=>{ const i=$("#fq"); i.focus(); i.setSelectionRange(i.value.length,i.value.length); }); }, 250); };
-  $("#fsp").onchange = e => { F.species=e.target.value; renderFlies(); };
+  const pick=$("#fsp"); if(pick){ pick.scrollLeft = renderFlies.sl||0;
+    const on=pick.querySelector(".fishchip.on"); if(on && !renderFlies.sl && on.dataset.sp) on.scrollIntoView({inline:"center", block:"nearest"});
+    pick.querySelectorAll("[data-sp]").forEach(b=>b.onclick=()=>{ renderFlies.sl=pick.scrollLeft; F.species=b.dataset.sp; navigator.vibrate?.(8); renderFlies(); }); }
   view.querySelectorAll("[data-w]").forEach(c=>c.onclick=()=>{ F.water=c.dataset.w; renderFlies(); });
   if($("#fcan")) $("#fcan").onclick=()=>{ F.canTie=!F.canTie; renderFlies(); };
   if($("#fmine")) $("#fmine").onclick=()=>{ F.mine=!F.mine; renderFlies(); };
@@ -1116,6 +1137,7 @@ sb.auth.onAuthStateChange((evt)=>{ if(evt==="SIGNED_IN"||evt==="SIGNED_OUT") aft
   if(wantNew){ if(S.user) editFly(); else { S.pendingNew=true; openAuth(); } }
 })();
 </script>
+<script src="fish.js"></script>
 <script src="scanner.js"></script>
 <script src="staterules.js"></script>
 <script src="fishtails.js" data-where="app" data-side="left" data-bottom="78" defer></script>
