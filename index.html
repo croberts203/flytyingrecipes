@@ -604,7 +604,7 @@ async function renderInventory(){
   $("#lowI").onclick=()=>{ invLowOnly=true; renderInventory(); };
   if($("#copyLow")) $("#copyLow").onclick=async()=>{ const txt="Fly tying shopping list:\n"+low.map(i=>`• ${matLabel(i.material)}`).join("\n"); try{ await navigator.clipboard.writeText(txt); toast("Copied"); }catch{ sheet(`<textarea style="min-height:200px">${esc(txt)}</textarea>`); } };
   wireBuyLinks(view); if($("#pendC")) $("#pendC").onclick=()=>askPurchases();
-  $("#scanBtn").onclick=()=>{ slog("tap_scan"); openScanner(); };
+  $("#scanBtn").onclick=()=>openScanner();
   $("#rcptBtn").onclick=()=>openReceipt();
   view.querySelectorAll("[data-inc]").forEach(b=>b.onclick=async e=>{ e.stopPropagation(); await adjust(+b.dataset.mat, +b.dataset.inc, "manual"); renderInventory(); });
   view.querySelectorAll("[data-inv]").forEach(r=>r.onclick=()=>editInvItem(S.inventory.find(i=>i.id===+r.dataset.inv)));
@@ -775,15 +775,10 @@ async function lookupUPC(code){
 }
 async function saveBarcode(code, materialId){ const { error } = await sb.from("material_barcodes").insert({ barcode:code, material_id:materialId }); if(error && !/duplicate/.test(error.message)) toast(error.message); }
 
-/* ---- scanner diagnostics (temporary): which step a scan reached, no personal data ---- */
-const SLOG_ID = Math.random().toString(36).slice(2,10);
-function slog(event, detail={}){ try{ sb.from("scan_logs").insert({ session:SLOG_ID, event:String(event).slice(0,40), detail, ua:navigator.userAgent.slice(0,300) }).then(()=>{},()=>{}); }catch(e){} }
 /* ---- barcode scanner ---- */
 let scanState = null;
 async function openScanner(){
-  slog("open", { fbscan:!!window.FBScan, detector:"BarcodeDetector" in window, sw:!!navigator.serviceWorker?.controller, standalone:!!navigator.standalone, mediaDevices:!!navigator.mediaDevices?.getUserMedia });
-  const onErr = e => slog("js_error", { msg:String(e.message||e.reason||e).slice(0,300) });
-  window.addEventListener("error", onErr); window.addEventListener("unhandledrejection", onErr);
+
   const el=document.createElement("div"); el.id="scanner";
   el.innerHTML=`<video playsinline muted autoplay></video><div class="frame"></div>
     <div class="bar"><div class="modes"><span class="chip on" data-mode="add">Bought (+1)</span><span class="chip" data-mode="use">Used up (−1)</span><span class="chip" data-mode="haul">Haul mode</span></div>
@@ -795,13 +790,12 @@ async function openScanner(){
   const video=$("video",el);
   scanState = { mode:"add", busy:false, last:"", lastT:0, haul:new Map(), stop:null };
   el.querySelectorAll("[data-mode]").forEach(c=>c.onclick=()=>{ scanState.mode=c.dataset.mode; el.querySelectorAll("[data-mode]").forEach(x=>x.classList.toggle("on",x===c)); $("#haulSave",el).classList.toggle("hide", scanState.mode!=="haul"); });
-  const close = () => { slog("close"); window.removeEventListener("error", onErr); window.removeEventListener("unhandledrejection", onErr); scanState?.stop?.(); el.remove(); scanState=null; if(S.tab==="inventory") renderInventory(); };
+  const close = () => { scanState?.stop?.(); el.remove(); scanState=null; if(S.tab==="inventory") renderInventory(); };
   $("#scanDone",el).onclick=close;
   $("#manualCode",el).onclick=()=>{ const c=prompt("Enter the barcode number"); if(c) handleCode(c.replace(/\D/g,"")); };
   $("#photoCode",el).onclick=()=>{ const f=document.createElement("input"); f.type="file"; f.accept="image/*"; f.capture="environment";
     f.onchange=async()=>{ const file=f.files[0]; if(!file) return; $("#scanMsg",el).innerHTML=`<span class="spinner"></span> Reading the photo…`;
-      slog("photo", { type:file.type, kb:Math.round(file.size/1024) });
-      const c = window.FBScan ? await FBScan.decodeImage(file) : null; slog("photo_result", { code:c||null });
+      const c = window.FBScan ? await FBScan.decodeImage(file) : null;
       if(c) handleCode(c); else $("#scanMsg",el).textContent="Couldn't find a barcode in that photo. Get closer, keep it flat and in focus, or tap “Type code”."; };
     f.click(); };
   $("#haulSave",el).onclick=async()=>{ for(const [mid,v] of scanState.haul) await adjust(mid, v.n, "haul"); toast(`Saved ${scanState.haul.size} item(s)`); scanState.haul.clear(); drawHaul(); };
@@ -820,7 +814,7 @@ async function openScanner(){
     if(data?.material) await done(data.material);
     else {
       $("#scanMsg",el).innerHTML=`<span class="spinner"></span> ✓ Read ${esc(code)}. Looking it up online…`;
-      const lookup = await lookupUPC(code); slog("lookup", { found:!!lookup?.found, reason:lookup?.reason||null, gotReply:!!lookup });
+      const lookup = await lookupUPC(code);
       const prefill = lookup?.found ? { name:lookup.name, brand:lookup.brand, color:lookup.color, size:lookup.size, category:lookup.category } : {};
       const s=pickMaterial({ title: lookup?.found ? "Is this it?" : "New barcode", barcode:code, prefill, lookup, onPick:done });
       s.style.zIndex=70; s.addEventListener("click",e=>{ if(e.target===s) scanState.busy=false; });
@@ -830,16 +824,15 @@ async function openScanner(){
   try{
     const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment", width:{ideal:1280}, height:{ideal:720} } });
     video.muted=true; video.playsInline=true; video.setAttribute("playsinline",""); video.setAttribute("muted","");
-    video.srcObject=stream; try{ await video.play(); slog("play_ok"); }catch(e){ slog("play_err", { name:e.name, msg:String(e.message).slice(0,200) }); /* iOS may start it on its own (autoplay); the reader waits for frames */ }
+    video.srcObject=stream; try{ await video.play(); }catch(e){ /* iOS may start it on its own (autoplay); the reader waits for frames */ }
     let running=true;
     scanState.stop=()=>{ running=false; stream.getTracks().forEach(t=>t.stop()); };
     if(!window.FBScan){ $("#scanMsg",el).textContent="Barcode reader didn't load. Tap “📸 Photo” or “Type code”."; return; }
     const stopRead = FBScan.start(video, (code, err)=>{
-      if(err){ slog("reader_err", { msg:String(err.message).slice(0,200) }); $("#scanMsg",el).textContent = err.message+" You can also tap “📸 Photo”."; return; }
-      if(!scanState || scanState.busy) return; slog("code", { code }); handleCode(code); }, i=>{ const n=$("#scanInfo",el); if(n) n.textContent=`${i.mode} · camera ${i.size} · checked ${i.frames} frames`;
-        if(i.frames===1 || (i.frames>0 && i.frames%40===0) || (i.frames===0 && !el._z0)){ if(i.frames===0) el._z0=1; slog("frames", i); } });
+      if(err){ $("#scanMsg",el).textContent = err.message+" You can also tap “📸 Photo”."; return; }
+      if(!scanState || scanState.busy) return; handleCode(code); }, i=>{ const n=$("#scanInfo",el); if(n) n.textContent=`${i.mode} · camera ${i.size} · checked ${i.frames} frames`; });
     const prevStop = scanState.stop; scanState.stop = ()=>{ stopRead(); prevStop(); };
-  }catch(err){ console.error(err); slog("camera_err", { name:err.name, msg:String(err.message).slice(0,200) }); $("#scanMsg",el).textContent="Camera unavailable. Allow camera access for this site, or tap “📸 Photo” or “Type code”."; }
+  }catch(err){ console.error(err); $("#scanMsg",el).textContent="Camera unavailable. Allow camera access for this site, or tap “📸 Photo” or “Type code”."; }
 }
 
 /* ---- receipt reader ---- */
@@ -1065,7 +1058,6 @@ sb.auth.onAuthStateChange((evt)=>{ if(evt==="SIGNED_IN"||evt==="SIGNED_OUT") aft
   await Promise.all([refreshUser(), loadBase()]);
   await loadInventory();
   if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("/sw.js").catch(()=>{});
-  setTimeout(()=>slog("app_load", { build:"2026-11-23c", signedIn:!!S.user, sw:!!navigator.serviceWorker?.controller, standalone:!!navigator.standalone }), 2500);
   const wantDelete = location.hash==="#delete-account";
   if(wantDelete){ history.replaceState(null,"",location.pathname); if(S.user) openAccount(); else { S.pendingAccount=true; openAuth(); } }
   if(location.hash==="#subscribe"){ history.replaceState(null,"",location.pathname); openSubscribe(); }
