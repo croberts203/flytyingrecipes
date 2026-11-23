@@ -45,7 +45,7 @@
     var u = "https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=" + lat.toFixed(2) + "&longitude=" + lng.toFixed(2) + "&localityLanguage=en";
     var ctl = window.AbortController ? new AbortController() : null, t = setTimeout(function () { ctl && ctl.abort(); }, 8000);
     return fetch(u, ctl ? { signal: ctl.signal } : {}).then(function (r) { return r.json(); }).then(function (d) {
-      if (!d || d.lookupSource !== "reverseGeocoding" || !d.principalSubdivision) return null;
+      if (!d || !d.principalSubdivision || !d.countryCode) return null; /* lookupSource is "coordinates" for GPS lookups */
       return { region_code: (d.principalSubdivisionCode || "").slice(0, 10) || null, region_name: String(d.principalSubdivision).slice(0, 80),
                country_code: (d.countryCode || "").slice(0, 3) || null, country_name: d.countryName || "" };
     }).catch(function () { return null; }).then(function (r) { clearTimeout(t); return r; });
@@ -84,6 +84,18 @@
     if (r.region_code === "US-FL" || SITES[r.region_code]) return "";
     return "We don't have a checked official link for " + r.region_name + " yet. Use the search, and make sure the page you land on belongs to the official state or government fishing agency before you rely on it.";
   }
+  /* Every state + DC, for picking by hand when location is off or wrong */
+  var STATES = {AL:"Alabama",AK:"Alaska",AZ:"Arizona",AR:"Arkansas",CA:"California",CO:"Colorado",CT:"Connecticut",DE:"Delaware",DC:"District of Columbia",
+    FL:"Florida",GA:"Georgia",HI:"Hawaii",ID:"Idaho",IL:"Illinois",IN:"Indiana",IA:"Iowa",KS:"Kansas",KY:"Kentucky",LA:"Louisiana",ME:"Maine",MD:"Maryland",
+    MA:"Massachusetts",MI:"Michigan",MN:"Minnesota",MS:"Mississippi",MO:"Missouri",MT:"Montana",NE:"Nebraska",NV:"Nevada",NH:"New Hampshire",NJ:"New Jersey",
+    NM:"New Mexico",NY:"New York",NC:"North Carolina",ND:"North Dakota",OH:"Ohio",OK:"Oklahoma",OR:"Oregon",PA:"Pennsylvania",RI:"Rhode Island",SC:"South Carolina",
+    SD:"South Dakota",TN:"Tennessee",TX:"Texas",UT:"Utah",VT:"Vermont",VA:"Virginia",WA:"Washington",WV:"West Virginia",WI:"Wisconsin",WY:"Wyoming"};
+  function byCode(code) { var k = String(code || "").replace(/^US-/, ""); return STATES[k] ? { region_code: "US-" + k, region_name: STATES[k], country_code: "US", country_name: "United States" } : null; }
+  function pickerHTML(id, selected, style) {
+    var o = '<option value="">Choose a state\u2026</option>';
+    Object.keys(STATES).forEach(function (k) { o += '<option value="' + k + '"' + (selected === "US-" + k ? " selected" : "") + ">" + STATES[k] + "</option>"; });
+    return '<select id="' + id + '" aria-label="Choose a state"' + (style ? ' style="' + style + '"' : "") + ">" + o + "</select>";
+  }
   function placeName(r) { return !r ? "" : r.region_name + ((r.country_code || "").toUpperCase() !== "US" && r.country_name ? ", " + r.country_name : ""); }
-  window.FBRules = { SITES: SITES, NOAA: NOAA, lookup: lookup, position: position, locate: locate, links: links, warning: warning, placeName: placeName };
+  window.FBRules = { SITES: SITES, NOAA: NOAA, lookup: lookup, position: position, locate: locate, links: links, warning: warning, placeName: placeName, STATES: STATES, byCode: byCode, pickerHTML: pickerHTML };
 })();

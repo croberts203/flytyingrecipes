@@ -903,13 +903,18 @@ const lookupRegion = (lat,lng) => window.FBRules ? FBRules.lookup(lat,lng) : Pro
 /* "Fishing rules near me": GPS → state → official links. Used on the Species tab and by #rules links. */
 function openNearbyRules(){
   const s=sheet(`<h2>Fishing rules near me</h2><div id="nrBox"><p class="small muted"><span class="spinner"></span> Getting your location…</p></div>
+    <div id="nrPick" style="margin:10px 0"></div>
     <p class="small muted">Only a rounded position (about 1 km) is used to find your state. Nothing is saved.</p><button class="btn alt" style="width:100%" id="nrX">Close</button>`);
   $("#nrX",s).onclick=()=>s.remove();
   if(!window.FBRules){ $("#nrBox",s).innerHTML=`<p class="small need">Couldn't load the rules finder. Check your connection.</p>`; return; }
-  FBRules.locate().then(p=>{ S.nearRegion=p.region||null;
-    $("#nrBox",s).innerHTML = p.region ? rulesLinks(p.region,"You're in") : `<p class="small">Couldn't work out your state. <a href="${FBRules.NOAA}" target="_blank" rel="noopener">State fishing websites ↗</a></p>`;
-    if(S.tab==="species") renderSpecies(); })
-  .catch(e=>{ $("#nrBox",s).innerHTML=`<p class="small need">${esc(e.message)}</p><p class="small"><a href="${FBRules.NOAA}" target="_blank" rel="noopener">State fishing websites ↗</a></p>`; });
+  const setRegion=(r,title)=>{ S.nearRegion=r||null; $("#nrBox",s).innerHTML = r ? rulesLinks(r,title) : ""; if(S.tab==="species") renderSpecies(); };
+  const picker=(r,label)=>{ $("#nrPick",s).innerHTML=`<label class="small" style="font-weight:600">${label}</label>${FBRules.pickerHTML("nrSel", r&&r.region_code, "width:100%;margin-top:4px")}`;
+    $("#nrSel",s).onchange=e=>{ const p=FBRules.byCode(e.target.value); if(p) setRegion(p,"Fishing rules for"); }; };
+  picker(null,"Or pick your state:");
+  FBRules.locate().then(p=>{
+    if(p.region){ setRegion(p.region,"You're in"); picker(p.region,"Not your state? Pick another:"); }
+    else { $("#nrBox",s).innerHTML=`<p class="small">Couldn't work out your state from your location.</p>`; picker(null,"Pick your state:"); } })
+  .catch(e=>{ $("#nrBox",s).innerHTML=`<p class="small need">${esc(e.message)}</p>`; picker(null,"Pick your state:"); });
 }
 function editCatch(c=null){
   const isNew=!c;

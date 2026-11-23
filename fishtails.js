@@ -94,19 +94,33 @@
       document.head.appendChild(sc);
     });
   }
+  var NOAA_URL = "https://www.fisheries.noaa.gov/recreational-fishing/state-recreational-fishing-websites";
+  function rulesHTML(R, r, intro) {
+    var ls = R.links(r);
+    return intro + (ls.length ? '<div class="ft-links">' + ls.map(function (l) { return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + " \u2197</a>"; }).join("") + "</div>" : "") +
+      (R.warning && R.warning(r) ? '<small style="display:block;margin-top:8px;color:#8a3b12;font-weight:600">\u26a0\ufe0f ' + esc(R.warning(r)) + "</small>" : "");
+  }
+  /* Shows the rules for a region, with an all-states picker underneath so anyone can switch or choose by hand */
+  function showRules(box, R, r, intro) {
+    var pid = "ft-st-" + Math.random().toString(36).slice(2, 8);
+    box.innerHTML = '<div class="ft-rules">' + (r ? rulesHTML(R, r, intro) : intro) + "</div>" +
+      '<div style="margin-top:10px"><small style="display:block;margin-bottom:4px;font-weight:600">' + (r ? "Not your state? Pick another:" : "Pick your state:") + "</small>" +
+      R.pickerHTML(pid, r && r.region_code, "width:100%;padding:8px;border-radius:8px;border:1px solid #cfc6ae;font:inherit;background:#fff") + "</div>" +
+      '<small style="display:block;margin-top:6px;opacity:.75">Rules change. Check the agency before you keep a fish. Only a rounded location (about 1 km) is used, and nothing is saved.</small>';
+    var sel = box.querySelector("#" + pid);
+    sel.onchange = function () { var p = R.byCode(sel.value); if (p) box.querySelector(".ft-rules").innerHTML = rulesHTML(R, p, "Official fishing rules for <b>" + esc(p.region_name) + "</b>:"); };
+    log.scrollTop = log.scrollHeight;
+  }
   function nearMe() {
     add("user", "Fishing rules near me");
     var wait = add("assistant", "Getting your location…");
     loadRules().then(function (R) {
-      if (!R) { wait.innerHTML = fmt("I couldn't load the rules finder. Try again, or see state fishing websites at https://www.fisheries.noaa.gov/recreational-fishing/state-recreational-fishing-websites"); return; }
+      if (!R) { wait.innerHTML = fmt("I couldn't load the rules finder. Try again, or see state fishing websites at " + NOAA_URL); return; }
       return R.locate().then(function (p) {
-        var r = p.region, ls = R.links(r);
-        wait.innerHTML = (r ? "You're in <b>" + esc(R.placeName(r)) + "</b>." + (ls.length ? " Here are the official fishing rules:" : "") : "I couldn't work out your state. Try these:") +
-          (ls.length ? '<div class="ft-links">' : '<div>') + ls.map(function (l) { return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + " \u2197</a>"; }).join("") + "</div>" +
-          (R.warning && R.warning(r) ? '<small style="display:block;margin-top:8px;color:#8a3b12;font-weight:600">\u26a0\ufe0f ' + esc(R.warning(r)) + '</small>' : '') +
-          '<small style="display:block;margin-top:6px;opacity:.75">Rules change. Check the agency before you keep a fish. Only a rounded location (about 1 km) is used, and nothing is saved.</small>';
-        log.scrollTop = log.scrollHeight;
-      }).catch(function (e) { wait.innerHTML = fmt(e.message + " You can also look up your state at https://www.fisheries.noaa.gov/recreational-fishing/state-recreational-fishing-websites"); });
+        var r = p.region;
+        if (r && (r.country_code || "").toUpperCase() !== "US") return showRules(wait, R, r, "You're in <b>" + esc(R.placeName(r)) + "</b>. Here's where to look up the rules:");
+        showRules(wait, R, r, r ? "You're in <b>" + esc(R.placeName(r)) + "</b>. Here are the official fishing rules:" : "I couldn't work out your state from your location.");
+      }).catch(function (e) { showRules(wait, R, null, esc(e.message)); });
     });
   }
   function ask(q) {
