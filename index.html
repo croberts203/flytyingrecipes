@@ -49,8 +49,10 @@ nav.tabs button.on svg{stroke:var(--slate)}
 .btn.sm{padding:6px 12px;font-size:.85rem;border-radius:999px}
 .btn:disabled{opacity:.5}
 .fab{position:fixed;right:16px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:25;border-radius:999px;padding:14px 18px;box-shadow:0 6px 18px rgba(0,0,0,.2)}
-input[type=text],input[type=email],input[type=password],input[type=number],input[type=search],input[type=datetime-local],select,textarea{width:100%;border:1px solid var(--line);background:#fff;border-radius:12px;padding:11px 14px}
+input[type=text],input[type=email],input[type=password],input[type=number],input[type=search],input[type=url],input[type=tel],input[type=datetime-local],input:not([type]),select,textarea{width:100%;border:1px solid var(--line);background:#fff;border-radius:12px;padding:11px 14px}
 input[type=search]{border-radius:999px;padding-left:18px}
+input[type=file]{width:100%;font:inherit;font-size:.9rem;color:var(--muted)}
+input[type=file]::file-selector-button{font:700 .9rem var(--body);border:0;border-radius:999px;background:var(--cream);color:var(--slate);padding:9px 16px;margin-right:10px;cursor:pointer}
 textarea{min-height:80px;resize:vertical}
 label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin:10px 0 4px}
 .chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
