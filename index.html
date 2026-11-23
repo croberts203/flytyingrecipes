@@ -110,7 +110,7 @@ ol.steps img{width:100%;border-radius:10px;margin-top:8px}
 #scanner{position:fixed;inset:0;z-index:60;background:#000;display:flex;flex-direction:column}
 .deskpair{display:flex;gap:14px;align-items:flex-start}.qrbox{width:150px;min-width:150px;height:150px;background:#fff;border-radius:10px;padding:6px;display:grid;place-items:center}.qrbox svg{width:100%;height:100%}
 .sheet.desk>div{max-width:720px}.deskit{padding:10px 12px;margin-bottom:8px}.deskit.done{opacity:.8}.deskit.new{border-left:4px solid var(--brass)}.deskit .row{gap:6px;margin-top:6px;align-items:center}.deskit input,.deskit select{margin:0}
-@media (pointer:coarse) and (max-width:700px){.desk-only{display:none}}
+@media (max-width:640px){.desk-only{display:none}}
 #scanner video{flex:1;width:100%;object-fit:cover}
 #scanner .frame{position:absolute;left:10%;right:10%;top:35%;height:22%;border:3px solid var(--brass);border-radius:12px;box-shadow:0 0 0 2000px rgba(0,0,0,.35)}
 #scanner .bar{position:absolute;left:0;right:0;bottom:0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));background:linear-gradient(transparent,rgba(0,0,0,.85));color:#fff}
@@ -1453,6 +1453,8 @@ sb.auth.onAuthStateChange((evt)=>{ if(evt==="SIGNED_IN"||evt==="SIGNED_OUT") aft
 </script>
 <script src="fish.js"></script>
 <script src="scanner.js"></script>
+<script src="tour.js"></script>
+<script src="fbtips.js"></script>
 <script src="staterules.js"></script>
 <script src="fishtails.js" data-where="app" data-side="left" data-bottom="78" defer></script>
 </body>
