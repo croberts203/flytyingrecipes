@@ -122,6 +122,7 @@ ol.steps img{width:100%;border-radius:10px;margin-top:8px}
 .hide{display:none!important}
 .hero-link{position:relative;display:block}.hero-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:3rem;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.6);pointer-events:none}
 .card.credit{border-left:4px solid #b5832f}
+.card.rules{border-left:4px solid #b5832f}.card.rules .row a.btn{text-decoration:none}
 .card.credit a.btn{display:block;color:#fff;text-decoration:none}
 </style>
 </head>
@@ -879,19 +880,60 @@ async function renderLog(){
   }
   fab("+ Log a fish", ()=>editCatch());
 }
-function regsHtml(spId){
+function regsHtml(spId, where){
   const sp=speciesById(spId); if(!sp) return "";
+  if(where && where.region_code && where.region_code!=="US-FL") return ""; /* FWC summaries are Florida-only */
   const rs=S.regs[spId]||[];
   return `<div class="card reg"><div class="row"><h3 class="grow">FWC rules: ${esc(sp.common_name)}</h3></div>
     ${rs.map(r=>`<dl style="margin:0"><dt>Region</dt><dd>${esc(r.region)}</dd>${r.size_limit?`<dt>Size</dt><dd>${esc(r.size_limit)}</dd>`:""}${r.bag_limit?`<dt>Bag limit</dt><dd>${esc(r.bag_limit)}</dd>`:""}${r.vessel_limit?`<dt>Vessel limit</dt><dd>${esc(r.vessel_limit)}</dd>`:""}${r.season?`<dt>Season</dt><dd>${esc(r.season)}</dd>`:""}${r.notes?`<dt>Notes</dt><dd class="small">${esc(r.notes)}</dd>`:""}</dl>`).join("")}
     <p class="small muted" style="margin:10px 0 0">Summary checked ${rs[0]?new Date(rs[0].verified_on+"T12:00").toLocaleDateString():""}. Rules change — verify before you keep a fish.</p>
     <a class="btn sm" style="display:inline-block;margin-top:8px;text-decoration:none" href="${esc(sp.fwc_url)}" target="_blank" rel="noopener">Official FWC page ↗</a></div>`;
 }
+/* Official state fishing sites: NOAA Fisheries' list of state recreational fishing websites */
+const STATE_FISH_SITES = {
+  "US-AK":"https://www.adfg.alaska.gov/index.cfm?adfg=fishingSport.main","US-AL":"https://www.outdooralabama.com/fishing",
+  "US-CA":"https://www.wildlife.ca.gov/Fishing","US-CT":"https://portal.ct.gov/deep/fishing/regulations/fishing-regulations",
+  "US-DE":"https://dnrec.alpha.delaware.gov/fish-wildlife/licenses/","US-FL":"https://myfwc.com/fishing/",
+  "US-GA":"https://coastalgadnr.org/RecreationalFishing","US-HI":"https://dlnr.hawaii.gov/dar/fishing/",
+  "US-ID":"https://idfg.idaho.gov/fish","US-LA":"https://www.wlf.louisiana.gov/fishing/recreational-fishing",
+  "US-MA":"https://www.mass.gov/eea/agencies/dfg/dmf/recreational-fishing/","US-MD":"https://dnr.maryland.gov/Fisheries/Pages/default.aspx",
+  "US-ME":"https://www.maine.gov/IFW/fishing-boating/fishing/laws-rules/index.html","US-MS":"https://www.dmr.ms.gov/recreational-fishing",
+  "US-NC":"https://deq.nc.gov/about/divisions/marine-fisheries","US-NH":"https://www.wildlife.nh.gov/saltwater-fisheries-new-hampshire/recreational-saltwater-fishing",
+  "US-NY":"https://www.dec.ny.gov/outdoor/fishing.html","US-OR":"https://myodfw.com/fishing","US-PA":"https://www.fishandboat.com/Pages/default.aspx",
+  "US-SC":"https://www.dnr.sc.gov/fishing.html","US-TX":"https://tpwd.texas.gov/regulations/outdoor-annual/fishing/fishing",
+  "US-WA":"https://wdfw.wa.gov/fishing/","US-WV":"https://wvdnr.gov/2025-fishing-regulations-guide"
+};
+function rulesLinks(r){
+  if(!r || !r.region_name) return "";
+  const q = encodeURIComponent(`${r.region_name} fishing regulations official`);
+  const isUS = (r.country_code||"").toUpperCase()==="US";
+  const search = `https://www.google.com/search?q=${q}${isUS?"+site%3A.gov":""}`;
+  const off = STATE_FISH_SITES[r.region_code];
+  const fl = r.region_code==="US-FL";
+  return `<div class="card rules" style="margin-top:8px"><div class="small muted">Fishing rules where you are</div>
+    <div style="font-weight:700;margin:2px 0 8px">📍 ${esc(r.region_name)}${!isUS&&r.country_name?`, ${esc(r.country_name)}`:""}</div>
+    <div class="row wrap">${fl?`<a class="btn sm" href="https://myfwc.com/fishing/saltwater/recreational/" target="_blank" rel="noopener">FWC saltwater rules ↗</a><a class="btn sm" href="https://myfwc.com/fishing/freshwater/regulations/" target="_blank" rel="noopener">FWC freshwater rules ↗</a>`
+      : off?`<a class="btn sm" href="${esc(off)}" target="_blank" rel="noopener">Official ${esc(r.region_name)} fishing site ↗</a>`:""}
+      <a class="btn sm alt" href="${esc(search)}" target="_blank" rel="noopener">${off||fl?"Search current rules":"Find "+esc(r.region_name)+" fishing rules"} ↗</a></div>
+    <p class="small muted" style="margin:6px 0 0">Rules change. Check the official agency before you keep a fish.</p></div>`;
+}
+/* Turns the phone's live GPS fix into a state/province. Only a rounded position (~1 km) is sent. */
+async function lookupRegion(lat, lng){
+  const u = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat.toFixed(2)}&longitude=${lng.toFixed(2)}&localityLanguage=en`;
+  const ctl = new AbortController(); const t = setTimeout(()=>ctl.abort(), 8000);
+  try{
+    const d = await (await fetch(u, { signal:ctl.signal })).json();
+    if(!d || d.lookupSource!=="reverseGeocoding" || !d.principalSubdivision) return null;
+    return { region_code:(d.principalSubdivisionCode||"").slice(0,10)||null, region_name:String(d.principalSubdivision).slice(0,80),
+             country_code:(d.countryCode||"").slice(0,3)||null, country_name:d.countryName||"" };
+  }catch(e){ return null; } finally { clearTimeout(t); }
+}
 function editCatch(c=null){
   const isNew=!c;
   c = c || { caught_at:new Date().toISOString(), lat:null, lng:null, species_id:null, kept:false };
   const local = new Date(new Date(c.caught_at).getTime() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16);
   let photoFile=null, lat=c.lat, lng=c.lng, ai={ guess:c.ai_guess, conf:c.ai_confidence };
+  let region = c.region_name ? { region_code:c.region_code, region_name:c.region_name, country_code:c.country_code } : null;
   const s=sheet(`<h2>${isNew?"Log a fish":"Edit catch"}</h2>
     <label>Photo</label><div class="photo-pick"><img id="cPrev" class="${c.photo_url?"":"hide"}" src="${c.photo_url||""}"><input type="file" accept="image/*" capture="environment" id="cPhoto"></div>
     <button class="btn brass" style="width:100%;margin-top:10px" id="cId" ${c.photo_url?"":"disabled"}>🔍 Identify species from photo</button>
@@ -903,6 +945,7 @@ function editCatch(c=null){
     <label>When</label><input type="datetime-local" id="cWhen" value="${local}">
     <label>Location</label>
     <div class="row"><button class="btn alt" id="cGps">📍 Use my location</button><span class="small muted grow" id="gpsTxt">${lat?`${lat.toFixed(5)}, ${lng.toFixed(5)}`:"No GPS yet"}</span></div>
+    <div id="rulesBox">${rulesLinks(region)}</div>
     <input type="text" id="cLoc" style="margin-top:6px" placeholder="Spot name (optional) — e.g. Mill Cove" value="${esc(c.location_name||"")}">
     <label>Fly used</label><select id="cFly"><option value="">—</option>${(S.flies||[]).map(f=>`<option value="${f.id}" ${c.fly_id===f.id?"selected":""}>${esc(f.name)}</option>`).join("")}</select>
     <div class="row"><div class="grow"><label>Length (in)</label><input type="number" step="0.25" id="cLen" value="${c.length_in??""}"></div><div class="grow"><label>Weight (lb)</label><input type="number" step="0.1" id="cWt" value="${c.weight_lb??""}"></div></div>
@@ -911,8 +954,8 @@ function editCatch(c=null){
     <div class="row" style="margin-top:12px"><button class="btn grow" id="cSave">Save</button>${!isNew?`<button class="btn danger" id="cDel">Delete</button>`:""}</div>`);
   const spSel=$("#cSp",s);
   const showSp=()=>{ const v=spSel.value; $("#cOther",s).classList.toggle("hide", v!=="other"); const sp=speciesById(+v);
-    $("#regBox",s).innerHTML = sp ? regsHtml(sp.id) : ""; $("#spHelp",s).innerHTML = sp?.id_tips?`<p class="small muted" style="margin:6px 0 0">ID tip: ${esc(sp.id_tips)}</p>`:""; checkKeep(); };
-  const checkKeep=()=>{ const sp=speciesById(+spSel.value); const rs=S.regs[sp?.id]||[]; const warn=$("#keepWarn",s); warn?.remove();
+    $("#regBox",s).innerHTML = sp ? regsHtml(sp.id, region) : ""; $("#spHelp",s).innerHTML = sp?.id_tips?`<p class="small muted" style="margin:6px 0 0">ID tip: ${esc(sp.id_tips)}</p>`:""; checkKeep(); };
+  const checkKeep=()=>{ const sp=speciesById(+spSel.value); const rs=(region&&region.region_code&&region.region_code!=="US-FL")?[]:(S.regs[sp?.id]||[]); const warn=$("#keepWarn",s); warn?.remove();
     if($("#cKept",s).checked && rs.some(r=>/catch and release/i.test(r.size_limit||""))) $("#cKept",s).closest("label").insertAdjacentHTML("afterend",`<p id="keepWarn" class="small need">This species is catch-and-release only.</p>`); };
   spSel.onchange=showSp; $("#cKept",s).onchange=checkKeep; showSp();
   $("#cPhoto",s).onchange=e=>{ photoFile=e.target.files[0]; if(photoFile){ const p=$("#cPrev",s); p.src=URL.createObjectURL(photoFile); p.classList.remove("hide"); $("#cId",s).disabled=false; } };
@@ -937,7 +980,10 @@ function editCatch(c=null){
     btn.disabled=false; btn.textContent="🔍 Identify species from photo";
   };
   $("#cGps",s).onclick=()=>{ $("#gpsTxt",s).innerHTML=`<span class="spinner"></span>`;
-    navigator.geolocation.getCurrentPosition(p=>{ lat=p.coords.latitude; lng=p.coords.longitude; $("#gpsTxt",s).textContent=`${lat.toFixed(5)}, ${lng.toFixed(5)} (±${Math.round(p.coords.accuracy)} m)`; },
+    navigator.geolocation.getCurrentPosition(async p=>{ lat=p.coords.latitude; lng=p.coords.longitude; $("#gpsTxt",s).textContent=`${lat.toFixed(5)}, ${lng.toFixed(5)} (±${Math.round(p.coords.accuracy)} m)`;
+        $("#rulesBox",s).innerHTML=`<p class="small muted" style="margin:6px 0 0"><span class="spinner"></span> Finding local fishing rules…</p>`;
+        const r = await lookupRegion(lat, lng); if(r){ region = r; showSp(); }
+        $("#rulesBox",s).innerHTML = r ? rulesLinks(r) : `<p class="small muted" style="margin:6px 0 0">Couldn't look up your state. <a href="https://www.fisheries.noaa.gov/recreational-fishing/state-recreational-fishing-websites" target="_blank" rel="noopener">State fishing websites ↗</a></p>`; },
       err=>{ $("#gpsTxt",s).textContent="Couldn't get location — allow location access"; }, { enableHighAccuracy:true, timeout:15000 }); };
   if(isNew) $("#cGps",s).click();
   if($("#cDel",s)) $("#cDel",s).onclick=async()=>{ if(!confirm("Delete this catch?")) return; await sb.from("catches").delete().eq("id",c.id); if(c.photo_path) await sb.storage.from("catch-photos").remove([c.photo_path]); s.remove(); S.catches=null; renderLog(); };
@@ -948,6 +994,7 @@ function editCatch(c=null){
       if(photoFile) photo_path = await uploadPhoto("catch-photos", photoFile);
       const v=spSel.value, spId = v && v!=="other" ? +v : null;
       const row={ caught_at:new Date($("#cWhen",s).value).toISOString(), lat, lng, location_name:$("#cLoc",s).value.trim()||null,
+        region_code:region?.region_code||null, region_name:region?.region_name||null, country_code:region?.country_code||null,
         species_id:spId, species_other: v==="other" ? $("#cOther",s).value.trim()||null : null, species_confirmed: !!(spId || v==="other"),
         ai_guess:ai.guess||null, ai_confidence:ai.conf||null, length_in:$("#cLen",s).value||null, weight_lb:$("#cWt",s).value||null,
         fly_id:$("#cFly",s).value?+$("#cFly",s).value:null, kept:$("#cKept",s).checked, photo_path, notes:$("#cNotes",s).value.trim()||null };
@@ -966,7 +1013,8 @@ function openCatch(c){
       ${c.lat?`<div class="small muted" style="margin-top:4px">📍 ${c.lat.toFixed(5)}, ${c.lng.toFixed(5)} · <a href="https://maps.google.com/?q=${c.lat},${c.lng}" target="_blank" rel="noopener">open map</a></div>`:""}
       ${c.ai_guess?`<div class="small muted" style="margin-top:4px">AI suggested: ${esc(c.ai_guess)} (${esc(c.ai_confidence||"")})</div>`:""}
       ${c.notes?`<p class="small" style="margin:8px 0 0">${esc(c.notes)}</p>`:""}</div>
-    ${sp?regsHtml(sp.id):""}
+    ${rulesLinks(c)}
+    ${sp?regsHtml(sp.id, c):""}
     <div class="card"><h3>Get a second opinion</h3><p class="small muted" style="margin:6px 0 8px">Post this catch to iNaturalist and their community will help confirm the species. Save the photo first, then upload it there.</p>
       <div class="row wrap">${c.photo_url?`<a class="btn sm alt" href="${c.photo_url}" target="_blank" rel="noopener" download>Save photo</a>`:""}<a class="btn sm" href="https://www.inaturalist.org/observations/upload" target="_blank" rel="noopener" id="inat">Open iNaturalist ↗</a></div></div>
     <div class="row"><button class="btn grow" id="ed">Edit</button><button class="btn alt grow" id="cl">Close</button></div>`);
