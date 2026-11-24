@@ -652,12 +652,14 @@ async function renderFlies(){
       <span class="chip ${F.water==="salt"?"on":""}" data-w="salt">Saltwater</span>
       <span class="chip ${F.water==="fresh"?"on":""}" data-w="fresh">Freshwater</span>
       <span class="chip ${filterCount(F)?"on":""}" id="ffilt">⚙ Filters${filterCount(F)?` (${filterCount(F)})`:""}</span>
+      <span class="chip ${F.sort==="newest"?"on":""}" id="fnew">🆕 Newest</span>
       <span class="chip ${F.favs?"on":""}" id="ffav">♥ Favorites${S.favs.size?` (${S.favs.size})`:""}</span>
       ${S.user?`<span class="chip ${F.canTie?"on":""}" id="fcan">Can tie now</span><span class="chip ${F.mine?"on":""}" id="fmine">My recipes</span>`:""}
     </div>
     ${F.species?forecastLink(speciesById(Number(F.species))):""}
     <p class="small muted">${list.length} ${list.length===1?"fly":"flies"}</p>
     <div id="flist">${list.map(flyCard).join("") || (F.favs && !S.favs.size ? emptyNice(FLY_ICON, "No favorites yet", "Tap the heart on any recipe to save it here.", "fClear", "Show all recipes") : emptyNice(FLY_ICON, "No flies match", "Try a different search, or clear the filters to see every recipe.", "fClear", "Clear filters"))}</div>`;
+  if($("#fnew")) $("#fnew").onclick=()=>{ F.sort = F.sort==="newest" ? "" : "newest"; renderFlies(); };
   if($("#bnSign")) $("#bnSign").onclick=openAuth;
   if($("#fClear")) $("#fClear").onclick=()=>{ Object.assign(F,{q:"",species:"",water:"",canTie:false,mine:false,favs:false,type:"",bug:"",season:"",diff:"",hooks:"",video:false,mats:"",sort:"",almost:false}); renderFlies(); };
   $("#fq").oninput = e => { F.q=e.target.value; clearTimeout(renderFlies.t); renderFlies.t=setTimeout(()=>{ renderFlies().then(()=>{ const i=$("#fq"); i.focus(); i.setSelectionRange(i.value.length,i.value.length); }); }, 250); };
