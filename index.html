@@ -540,7 +540,6 @@ function openAccount(){
     <div class="row" style="margin-top:12px"><button class="btn" id="saveDn">Save</button><button class="btn alt" id="out">Sign out</button></div>
     <p class="small muted" id="aiLeft"></p>
     <label class="row" style="gap:8px;align-items:flex-start;margin-top:10px;font-weight:400"><input type="checkbox" id="nlToggle" style="width:auto;margin-top:3px" disabled><span class="small">Weekly email: one fly tying tip, technique or pattern a week from the Fly Tying Recipes blog.</span></label>
-    <label>Shop for materials at</label><select id="shopSel">${Object.entries(SHOPS).map(([k,v])=>`<option value="${k}" ${shopKey()===k?"selected":""}>${v.name}</option>`).join("")}</select>
     ${S.profile?.is_admin?`<button class="btn brass" id="statsBtn" style="width:100%;margin-top:14px">📊 App stats &amp; invite links</button>`:""}
     <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
     <p class="small"><a href="/privacy.html" target="_blank" rel="noopener">Privacy policy</a>${S.hidden?.size?` · <a href="#" id="unhide">Show hidden members (${S.hidden.size})</a>`:""}</p>
@@ -551,7 +550,6 @@ function openAccount(){
   $("#saveDn",s).onclick = async()=>{ await sb.from("profiles").update({display_name:$("#dn",s).value.trim()}).eq("id",S.user.id); await refreshUser(); s.remove(); toast("Saved"); };
   sb.rpc("my_newsletter").then(({data})=>{ const c=$("#nlToggle",s); if(c){ c.checked=!!data; c.disabled=false; } });
   $("#nlToggle",s).onchange = async e=>{ const on=e.target.checked; e.target.disabled=true; const { error } = await sb.rpc("set_newsletter", { p_on:on }); e.target.disabled=false; if(error){ e.target.checked=!on; return toast("Couldn't change your email setting"); } toast(on?"You're on the weekly email":"You won't get the weekly email"); };
-  $("#shopSel",s).onchange = e=>{ lsSet("fb_shop", e.target.value); toast("Saved"); };
   $("#out",s).onclick = async()=>{ await sb.auth.signOut(); s.remove(); await afterAuth(); };
   if($("#unhide",s)) $("#unhide",s).onclick = async e=>{ e.preventDefault(); await sb.from("hidden_authors").delete().eq("user_id", S.user.id); s.remove(); S.flies=null; toast("Hidden members shown again"); render(); };
   $("#delAcct",s).onclick = async()=>{
@@ -972,26 +970,43 @@ const shopUrl = q => SHOPS[shopKey()].url(shopQuery(cleanBuy(q)));
 const pendingBuys = () => S.user ? lsGet("fb_pending_"+S.user.id, []) : [];
 const setPending = list => S.user && lsSet("fb_pending_"+S.user.id, list);
 function buyLink({ label, material_id=null, category="other" }){
-  return `<a class="buy" href="${shopUrl(label)}" target="_blank" rel="noopener" title="Opens a search sorted by lowest price (${esc(SHOPS[shopKey()].name)})" data-buy="${esc(JSON.stringify({label, material_id, category}))}">🛒 Lowest price</a>`;
+  return `<a class="buy" href="#" title="Fly shops within 200 miles" data-buy="${esc(JSON.stringify({label, material_id, category}))}">📍 Local shops</a>`;
 }
 const PRICE_FN = SUPABASE_URL + "/functions/v1/price-check";
 function trackBuy(it){ if(!S.user) return; it = {...it}; it.key = it.material_id ? "m"+it.material_id : "t"+it.label.toLowerCase(); it.at = Date.now(); setPending([...pendingBuys().filter(x=>x.key!==it.key), it]); }
+// Fly shops within 200 miles. Distances are from the viewer's location if they share it, otherwise from Jacksonville, FL.
+const LOCAL_SHOPS = [
+  { name:"Black Fly Outfitters", addr:"11702 Beach Blvd #109, Jacksonville, FL 32246", phone:"(904) 646-0007", lat:30.2866, lng:-81.5306, web:null, note:"Fly shop with the Black Fly Café. Call to check stock." },
+  { name:"Bass Pro Shops – St. Augustine/Jacksonville", addr:"355 World Commerce Pkwy, St. Augustine, FL 32092", phone:"(904) 815-6100", lat:29.9886, lng:-81.4637, web:"https://stores.basspro.com/us/fl/st.-augustine/355-world-commerce-parkway.html", note:"Fly fishing and tying section. Call to check stock." },
+  { name:"Orlando Outfitters", addr:"2814 Corrine Dr, Orlando, FL 32803", phone:"(407) 896-8220", lat:28.5700, lng:-81.3480, web:"https://orlandooutfitters.com", live:true, note:"Full fly shop with a large tying selection." },
+  { name:"Rivers & Glen Trading Co.", addr:"24 E Broughton St, Savannah, GA 31401", phone:"(912) 349-2352", lat:32.0790, lng:-81.0910, web:"https://www.riversandglen.com", live:true, note:"Savannah fly shop and outfitter." },
+];
+const HOME_POINT = { lat:30.2900, lng:-81.5200, label:"Jacksonville, FL" };
+const milesBetween=(a,b)=>{ const R=3958.8, r=x=>x*Math.PI/180, dLat=r(b.lat-a.lat), dLng=r(b.lng-a.lng); const h=Math.sin(dLat/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLng/2)**2; return 2*R*Math.asin(Math.sqrt(h)); };
+const shopOrigin = () => lsGet("fb_loc", null) || HOME_POINT;
 async function openPriceSheet(it){
-  const q = cleanBuy(it.label);
-  const s = sheet(`<h2>Lowest price</h2><p class="small muted" style="margin:0 0 8px">${esc(q)}</p><div id="pcBody"><p class="muted"><span class="spinner"></span> Checking live prices at fly shops…</p></div>
-    <h3 style="margin-top:16px">Also compare (sorted cheapest first)</h3>
-    <div class="row" style="gap:8px;flex-wrap:wrap">${Object.entries(SHOPS).map(([k,v])=>`<a class="btn sm alt" target="_blank" rel="noopener" data-trk href="${v.url(shopQuery(q))}">${esc(v.name.replace(/ \(.*\)/,""))}</a>`).join("")}</div>`);
+  const q = cleanBuy(it.label); const origin = shopOrigin();
+  const near = LOCAL_SHOPS.map(x=>({...x, mi:Math.round(milesBetween(origin,x))})).filter(x=>x.mi<=200).sort((a,b)=>a.mi-b.mi);
+  const s = sheet(`<h2>Local fly shops</h2><p class="small muted" style="margin:0 0 4px">${esc(q)}</p>
+    <p class="small muted" style="margin:0 0 8px">Within 200 miles of ${esc(origin.label)} · <a href="#" id="pcLoc">${lsGet("fb_loc",null)?"Update my location":"Use my location"}</a></p>
+    <div id="pcBody">${near.length?near.map((x,i)=>`<div class="card" style="margin:8px 0;padding:10px 12px">
+      <div class="row"><b class="grow">${esc(x.name)}</b><span class="small muted">${x.mi} mi</span></div>
+      <div class="small muted">${esc(x.addr)}</div>
+      <div class="small" style="margin:4px 0">${esc(x.note)}</div>
+      <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:6px"><a class="btn sm alt" href="tel:${x.phone.replace(/[^0-9]/g,"")}" data-trk>📞 ${esc(x.phone)}</a><a class="btn sm alt" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(x.name+", "+x.addr)}">🧭 Directions</a>${x.web?`<a class="btn sm alt" target="_blank" rel="noopener" href="${esc(x.web)}" data-trk>🌐 Website</a>`:""}</div>
+      ${x.live?`<div class="pcLive small muted" data-shop="${esc(x.name)}" style="margin-top:8px"><span class="spinner"></span> Checking their stock…</div>`:""}
+    </div>`).join(""):`<p class="muted">No fly shops on our list within 200 miles of you yet. <a target="_blank" rel="noopener" href="https://www.google.com/maps/search/fly+shop/@${origin.lat},${origin.lng},9z">Find fly shops near you on Google Maps</a>.</p>`}</div>
+    <p class="small muted" style="margin-top:8px">Prices shown are each shop's current online price; call ahead to check what's on the shelf. Know a shop we've missed? Tell us at chris@flytyingrecipes.org.</p>`);
   s.querySelectorAll("[data-trk]").forEach(a=>a.addEventListener("click",()=>trackBuy(it)));
+  $("#pcLoc",s).onclick=e=>{ e.preventDefault(); if(!navigator.geolocation) return toast("Location isn't available on this device");
+    navigator.geolocation.getCurrentPosition(p=>{ lsSet("fb_loc",{lat:p.coords.latitude,lng:p.coords.longitude,label:"your location"}); s.remove(); openPriceSheet(it); }, ()=>toast("Couldn't get your location"), {timeout:10000}); };
+  if(!near.some(x=>x.live)) return;
   try{
-    const r = await fetch(PRICE_FN+"?q="+encodeURIComponent(q)); const j = await r.json(); if(!r.ok) throw new Error(j.error||"Price check failed");
-    const when = new Date(j.checked_at).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
-    const okShops = j.shops.filter(x=>x.ok);
-    $("#pcBody",s).innerHTML = (j.items.length ? `<ul style="list-style:none;padding:0;margin:0">${j.items.map((x,i)=>`<li style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center">
-        <b style="min-width:62px;${i===0?"color:var(--sea)":""}">$${x.price.toFixed(2)}</b><span class="grow"><a href="${esc(x.url)}" target="_blank" rel="noopener" data-trk>${esc(x.title)}</a><br><span class="small muted">${esc(x.shop)}${i===0?" · cheapest found":""}</span></span></li>`).join("")}</ul>`
-        : `<p class="muted">No matching product found at the fly shops. Try the store searches below.</p>`)
-      + `<p class="small muted" style="margin-top:8px">Checked at ${when}: ${okShops.map(x=>esc(x.name)).join(", ")}${okShops.length<j.shops.length?` (${j.shops.length-okShops.length} shop${j.shops.length-okShops.length>1?"s":""} didn't answer)`:""}. Prices before shipping and tax; check the item matches your recipe before buying.</p>`;
-    $("#pcBody",s).querySelectorAll("[data-trk]").forEach(a=>a.addEventListener("click",()=>trackBuy(it)));
-  }catch(err){ $("#pcBody",s).innerHTML = `<p class="muted">Couldn't check prices right now (${esc(err.message)}). Use the store searches below.</p>`; }
+    const r = await fetch(PRICE_FN+"?set=local&q="+encodeURIComponent(q)); const j = await r.json(); if(!r.ok) throw new Error(j.error||"Price check failed");
+    s.querySelectorAll(".pcLive").forEach(el=>{ const items=j.items.filter(x=>x.shop===el.dataset.shop).slice(0,4);
+      el.innerHTML = items.length ? `In stock online now:<ul style="list-style:none;padding:0;margin:4px 0 0">${items.map(x=>`<li style="padding:3px 0"><b>$${x.price.toFixed(2)}</b> <a href="${esc(x.url)}" target="_blank" rel="noopener" data-trk>${esc(x.title)}</a></li>`).join("")}</ul>` : "No exact match in their online store. Call to ask.";
+      el.querySelectorAll("[data-trk]").forEach(a=>a.addEventListener("click",()=>trackBuy(it))); });
+  }catch(err){ s.querySelectorAll(".pcLive").forEach(el=>el.textContent="Couldn't check their stock right now. Call to ask."); }
 }
 function wireBuyLinks(root){
   root.querySelectorAll("[data-buy]").forEach(a=>a.onclick=e=>{
