@@ -261,7 +261,7 @@ const FISH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const S = {
   user:null, profile:null, tab:"flies",
   species:[], regs:{}, flies:null, inventory:[], catches:null,
-  flyFilter:{species:"", water:"", q:"", canTie:false, mine:false, favs:false, type:"", bug:"", season:"", diff:"", hooks:"", video:false}, favs:new Set(),
+  flyFilter:{species:"", water:"", q:"", canTie:false, mine:false, favs:false, type:"", bug:"", season:"", diff:"", hooks:"", video:false, mats:"", sort:"", almost:false}, favs:new Set(),
 };
 
 /* ---------------- helpers ---------------- */
@@ -465,6 +465,7 @@ function useMaterials(f, count=1){
     toast(low ? `Bench updated. ${low} ${low===1?"item is":"items are"} running low: see Materials › Low / out.` : "Bench updated.", 4000);
     if(S.tab==="inventory") renderInventory(); };
 }
+function missingCount(f){ if(!S.user) return 99; return (f.fly_materials||[]).filter(m=>{ const st=matStatus(m); return !(st==="have" || (st==="maybe" && SUBBABLE.has(m.category))); }).length; }
 function canTie(f){ if(!S.user) return false; const mats=f.fly_materials||[]; return mats.length>0 && mats.every(m => { const st=matStatus(m); return st==="have" || (st==="maybe" && SUBBABLE.has(m.category)); }); }
 
 /* ---------------- auth ---------------- */
@@ -586,7 +587,7 @@ const flyText = f => `${f.name} ${f.fly_type||""} ${f.description||""} ${f.imita
 const matches = (rx, t) => rx.test(t);
 function flyHas(f, list, key){ const row=list.find(x=>x[0]===key); if(!row) return true; const t = list===SEASONS ? `${f.hatch||""} ${f.fishing_tips||""}`.toLowerCase() : list===FLY_TYPES ? `${f.fly_type||""} ${f.name}`.toLowerCase() : flyText(f);
   if(list===SEASONS && /all (year|season)/.test(t)) return true; return matches(row[2], t); }
-const filterCount = F => ["type","bug","diff","season","hooks"].filter(k=>F[k]).length + (F.video?1:0);
+const filterCount = F => ["type","bug","diff","season","hooks","mats","sort"].filter(k=>F[k]).length + (F.video?1:0) + (F.almost?1:0);
 function openFilters(){
   const F=S.flyFilter; const opt=(list,val)=>list.map(([k,l])=>`<option value="${k}" ${val===k?"selected":""}>${l}</option>`).join("");
   const spOpts = S.species.filter(sp=>S.flies.some(f=>(f.fly_species||[]).some(x=>x.species_id===sp.id))).sort((a,b)=>a.common_name.localeCompare(b.common_name));
@@ -598,10 +599,13 @@ function openFilters(){
     <label>Difficulty</label><select id="xDiff"><option value="">Any</option><option value="beginner" ${F.diff==="beginner"?"selected":""}>Beginner</option><option value="intermediate" ${F.diff==="intermediate"?"selected":""}>Intermediate</option><option value="advanced" ${F.diff==="advanced"?"selected":""}>Advanced</option></select>
     <label>Water</label><select id="xWater"><option value="">Fresh or salt</option><option value="fresh" ${F.water==="fresh"?"selected":""}>Freshwater</option><option value="salt" ${F.water==="salt"?"selected":""}>Saltwater</option></select>
     <label>Hook size</label><select id="xHooks"><option value="">Any size</option><option value="big" ${F.hooks==="big"?"selected":""}>Big (#8 and larger)</option><option value="mid" ${F.hooks==="mid"?"selected":""}>Medium (#10–16)</option><option value="small" ${F.hooks==="small"?"selected":""}>Small (#18 and smaller)</option></select>
+    <label>Number of materials</label><select id="xMats"><option value="">Any</option><option value="few" ${F.mats==="few"?"selected":""}>5 or fewer (quick ties)</option><option value="many" ${F.mats==="many"?"selected":""}>8 or more (projects)</option></select>
+    <label>Sort by</label><select id="xSort"><option value="">Recommended</option><option value="az" ${F.sort==="az"?"selected":""}>Name A–Z</option><option value="easy" ${F.sort==="easy"?"selected":""}>Easiest first</option><option value="hard" ${F.sort==="hard"?"selected":""}>Hardest first</option><option value="fewest" ${F.sort==="fewest"?"selected":""}>Fewest materials</option><option value="small" ${F.sort==="small"?"selected":""}>Smallest hooks first</option><option value="big" ${F.sort==="big"?"selected":""}>Biggest hooks first</option>${S.user?`<option value="ready" ${F.sort==="ready"?"selected":""}>Closest to tieable from my bench</option>`:""}<option value="newest" ${F.sort==="newest"?"selected":""}>Newest added</option></select>
+    ${S.user?`<label class="row" style="gap:8px;margin-top:12px"><input type="checkbox" id="xAlmost" ${F.almost?"checked":""} style="width:auto"> Missing just one material</label>`:""}
     <label class="row" style="gap:8px;margin-top:12px"><input type="checkbox" id="xVid" ${F.video?"checked":""} style="width:auto"> Has a tying video</label>
     <div class="row" style="gap:8px;margin-top:16px"><button class="btn alt grow" id="xClear">Clear all</button><button class="btn grow" id="xGo">Show flies</button></div>`);
-  $("#xClear",s).onclick=()=>{ Object.assign(F,{species:"",type:"",bug:"",season:"",diff:"",water:"",hooks:"",video:false}); s.remove(); renderFlies(); };
-  $("#xGo",s).onclick=()=>{ Object.assign(F,{species:$("#xSp",s).value,type:$("#xType",s).value,bug:$("#xBug",s).value,season:$("#xSeason",s).value,diff:$("#xDiff",s).value,water:$("#xWater",s).value,hooks:$("#xHooks",s).value,video:$("#xVid",s).checked}); s.remove(); renderFlies(); window.scrollTo(0,0); };
+  $("#xClear",s).onclick=()=>{ Object.assign(F,{species:"",type:"",bug:"",season:"",diff:"",water:"",hooks:"",video:false,mats:"",sort:"",almost:false}); s.remove(); renderFlies(); };
+  $("#xGo",s).onclick=()=>{ Object.assign(F,{species:$("#xSp",s).value,type:$("#xType",s).value,bug:$("#xBug",s).value,season:$("#xSeason",s).value,diff:$("#xDiff",s).value,water:$("#xWater",s).value,hooks:$("#xHooks",s).value,video:$("#xVid",s).checked,mats:$("#xMats",s).value,sort:$("#xSort",s).value,almost:!!$("#xAlmost",s)?.checked}); s.remove(); renderFlies(); window.scrollTo(0,0); };
 }
 // Hook sizes like "#12–18 dry", "2/0", "#4–10". Bigger hooks have smaller numbers; aught sizes count as big.
 function hookBand(f, band){ const t=(f.hook_sizes||""); const nums=[...t.matchAll(/(\d+)\/0|#?(\d+)/g)].map(m=>m[1]?-Number(m[1]):Number(m[2])).filter(n=>n<=32); if(!nums.length) return true;
@@ -632,8 +636,14 @@ async function renderFlies(){
     if(F.canTie && !canTie(f)) return false;
     if(F.mine && f.author_id !== S.user?.id) return false;
     if(F.favs && !S.favs.has(f.id)) return false;
+    if(F.almost && !(S.user && missingCount(f)===1)) return false;
+    if(F.mats==="few" && (f.fly_materials||[]).length>5) return false;
+    if(F.mats==="many" && (f.fly_materials||[]).length<8) return false;
     return true;
   });
+  const DIFF_RANK={beginner:1,intermediate:2,advanced:3}; const minHook=f=>{ const n=[...(f.hook_sizes||"").matchAll(/(\d+)\/0|#?(\d+)/g)].map(m=>m[1]?-Number(m[1]):Number(m[2])).filter(n=>n<=32); return n.length?Math.max(...n):0; };
+  const SORTS={az:(a,b)=>a.name.localeCompare(b.name), easy:(a,b)=>(DIFF_RANK[a.difficulty]||2)-(DIFF_RANK[b.difficulty]||2)||a.name.localeCompare(b.name), hard:(a,b)=>(DIFF_RANK[b.difficulty]||2)-(DIFF_RANK[a.difficulty]||2)||a.name.localeCompare(b.name), fewest:(a,b)=>(a.fly_materials||[]).length-(b.fly_materials||[]).length, small:(a,b)=>minHook(b)-minHook(a), big:(a,b)=>minHook(a)-minHook(b), ready:(a,b)=>missingCount(a)-missingCount(b), newest:(a,b)=>(b.id||0)-(a.id||0)};
+  if(F.sort && SORTS[F.sort]) list=[...list].sort(SORTS[F.sort]);
   const banner = `<div class="banner"><h2>${S.user?"What are you tying today?":"Tie it. Fish it. Log it."}</h2><p>${S.user?"Recipes sorted by the fish you're after, matched to the materials on your bench.":"Free fly recipes sorted by species. Sign in to track your materials and see what you can tie right now."}</p>${S.user?"":`<button class="btn sm" id="bnSign">Sign in free</button>`}</div>`;
   view.innerHTML = banner + `
     <input type="search" id="fq" placeholder="Search flies, materials, insects…" value="${esc(F.q)}">
@@ -651,7 +661,7 @@ async function renderFlies(){
     <p class="small muted">${list.length} ${list.length===1?"fly":"flies"}</p>
     <div id="flist">${list.map(flyCard).join("") || (F.favs && !S.favs.size ? emptyNice(FLY_ICON, "No favorites yet", "Tap the heart on any recipe to save it here.", "fClear", "Show all recipes") : emptyNice(FLY_ICON, "No flies match", "Try a different search, or clear the filters to see every recipe.", "fClear", "Clear filters"))}</div>`;
   if($("#bnSign")) $("#bnSign").onclick=openAuth;
-  if($("#fClear")) $("#fClear").onclick=()=>{ Object.assign(F,{q:"",species:"",water:"",canTie:false,mine:false,favs:false,type:"",bug:"",season:"",diff:"",hooks:"",video:false}); renderFlies(); };
+  if($("#fClear")) $("#fClear").onclick=()=>{ Object.assign(F,{q:"",species:"",water:"",canTie:false,mine:false,favs:false,type:"",bug:"",season:"",diff:"",hooks:"",video:false,mats:"",sort:"",almost:false}); renderFlies(); };
   $("#fq").oninput = e => { F.q=e.target.value; clearTimeout(renderFlies.t); renderFlies.t=setTimeout(()=>{ renderFlies().then(()=>{ const i=$("#fq"); i.focus(); i.setSelectionRange(i.value.length,i.value.length); }); }, 250); };
   const pick=$("#fsp"); if(pick){ pick.scrollLeft = renderFlies.sl||0;
     const on=pick.querySelector(".fishchip.on"); if(on && !renderFlies.sl && on.dataset.sp) on.scrollIntoView({inline:"center", block:"nearest"});
