@@ -353,9 +353,17 @@ async function loadBase(){
   S.regs = {}; (rg||[]).forEach(r => (S.regs[r.species_id] ||= []).push(r));
 }
 async function loadFlies(){
-  const { data, error } = await sb.from("flies")
-    .select("*, fly_species(species_id), fly_materials(*), fly_steps(*), author:profiles!flies_author_profile_fk(display_name)")
-    .order("is_starter", { ascending:false }).order("name");
+  // The server returns at most 1,000 rows per request, so read the library in pages.
+  const PAGE = 1000; let data = [], error = null;
+  for(let from = 0; ; from += PAGE){
+    const r = await sb.from("flies")
+      .select("*, fly_species(species_id), fly_materials(*), fly_steps(*), author:profiles!flies_author_profile_fk(display_name)")
+      .order("is_starter", { ascending:false }).order("name").order("id")
+      .range(from, from + PAGE - 1);
+    if(r.error){ error = r.error; break; }
+    data = data.concat(r.data || []);
+    if(!r.data || r.data.length < PAGE) break;
+  }
   if(error){ console.error(error); toast("Couldn't load flies"); S.flies=[]; return; }
   S.hidden = new Set();
   if(S.user){ const { data: h } = await sb.from("hidden_authors").select("author_id"); (h||[]).forEach(x=>S.hidden.add(x.author_id)); }
