@@ -707,7 +707,7 @@ function openFly(id){
     ${f.imitates||f.hatch?`<div class="card hatchcard"><h3>Hatch &amp; entomology</h3>${f.imitates?`<p class="small" style="margin:6px 0 0"><b>Imitates:</b> ${esc(f.imitates)}</p>`:""}${f.hatch?`<p class="small" style="margin:6px 0 0"><b>When:</b> ${esc(f.hatch)}</p>`:""}</div>`:""}
     ${f.fishing_tips?`<div class="card"><h3>How to fish it</h3><p class="small" style="margin:6px 0 0">${esc(f.fishing_tips)}</p></div>`:""}
     <div class="card"><div class="row"><h3 class="grow">Materials</h3>${S.user?`<span class="small muted">vs. your bench</span>`:""}</div>
-      <ul style="list-style:none;padding:0;margin:8px 0 0">${mats.map(m=>{ const st=matStatus(m); const ph=catPhotoUrl(m.category,96); return `<li style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px"><span class="matthumb sm">${ph?`<img src="${ph}" alt="" loading="lazy">`:FLY_ICON}</span><span>${st?`<span class="dot ${st}"></span>`:""}<b>${esc(m.part||"")}</b>${m.part?": ":""}${esc(m.material_text)}</span>${st!=="have"?`<span style="margin-left:auto">${buyLink({ label:m.material_text, material_id:m.material_id||null, category:m.category||"other" })}</span>`:""}</li>`; }).join("")}</ul><p class="small muted" style="margin:6px 0 0">Material pictures show the type of material. <a href="#" class="matCred">Photo credits</a></p>
+      <ul style="list-style:none;padding:0;margin:8px 0 0">${mats.map(m=>{ const st=matStatus(m); const ph=catPhotoUrl(m.category,96); return `<li style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px"><span class="matthumb sm">${ph?`<img src="${ph}" alt="" loading="lazy">`:FLY_ICON}</span><span>${st?`<span class="dot ${st}"></span>`:""}<b>${esc(m.part||"")}</b>${m.part?": ":""}${esc(m.material_text)}</span><span style="margin-left:auto;flex:none">${buyLink({ label:(m.part&&!/hook|thread|bead|eyes|wire/i.test(m.material_text)&&/^(hook|thread|bead|eyes|wire)$/i.test(m.part)?m.part+" ":"")+m.material_text, material_id:m.material_id||null, category:m.category||"other" })}</span></li>`; }).join("")}</ul><p class="small muted" style="margin:6px 0 0">Material pictures show the type of material. <a href="#" class="matCred">Photo credits</a></p>
       ${S.user && S.inventory.length?`<p class="small muted" style="margin:8px 0 0"><span class="dot have"></span>have <span class="dot maybe" style="margin-left:8px"></span>have something similar <span class="dot need" style="margin-left:8px"></span>need</p>`:""}
       ${needList.length?`<button class="btn sm alt" style="margin-top:10px" id="copyNeed">Copy shopping list (${needList.length})</button>`:""}
     </div>
@@ -948,20 +948,22 @@ function openSubscribe(){
 
 /* ---------------- buying materials ---------------- */
 const SHOPS = {
-  google: { name:"Google Shopping (compare stores)", url:q=>`https://www.google.com/search?tbm=shop&q=${encodeURIComponent(q)}` },
-  amazon: { name:"Amazon", url:q=>`https://www.amazon.com/s?k=${encodeURIComponent(q)}` },
-  ebay:   { name:"eBay", url:q=>`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}` },
+  google: { name:"Lowest price across stores (Google Shopping, cheapest first)", url:q=>`https://www.google.com/search?tbm=shop&tbs=p_ord:p&q=${encodeURIComponent(q)}` },
+  amazon: { name:"Amazon (cheapest first)", url:q=>`https://www.amazon.com/s?k=${encodeURIComponent(q)}&s=price-asc-rank` },
+  ebay:   { name:"eBay (cheapest incl. shipping)", url:q=>`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}&_sop=15` },
 };
 const lsGet=(k,d)=>{ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch{ return d; } };
 const lsSet=(k,v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} };
 const shopKey = () => SHOPS[lsGet("fb_shop","google")] ? lsGet("fb_shop","google") : "google";
 const shopQuery = q => /fly|hook|thread|bucktail|dubbing|chenille|flash|marabou|eyes/i.test(q) ? q : `${q} fly tying`;
-const shopUrl = q => SHOPS[shopKey()].url(shopQuery(String(q).replace(/\s*·\s*/g," ")));
+// Turn "Gamakatsu B10S, #1/0–2/0 (or similar)" into a clean shopping search.
+const cleanBuy = q => String(q).replace(/\s*·\s*/g," ").replace(/\((?:optional|or similar|e\.g\.[^)]*|[^)]*substitute[^)]*)\)/gi,"").replace(/\b(e\.g\.|optional|or similar)\b/gi,"").split(/;| or /i)[0].replace(/[,–-]\s*$/,"").replace(/\s+/g," ").trim().slice(0,80);
+const shopUrl = q => SHOPS[shopKey()].url(shopQuery(cleanBuy(q)));
 // Things the user tapped Buy on. We can't see the store's checkout, so we ask when they come back.
 const pendingBuys = () => S.user ? lsGet("fb_pending_"+S.user.id, []) : [];
 const setPending = list => S.user && lsSet("fb_pending_"+S.user.id, list);
 function buyLink({ label, material_id=null, category="other" }){
-  return `<a class="buy" href="${shopUrl(label)}" target="_blank" rel="noopener" data-buy="${esc(JSON.stringify({label, material_id, category}))}">🛒 Buy</a>`;
+  return `<a class="buy" href="${shopUrl(label)}" target="_blank" rel="noopener" title="Opens a search sorted by lowest price (${esc(SHOPS[shopKey()].name)})" data-buy="${esc(JSON.stringify({label, material_id, category}))}">🛒 Lowest price</a>`;
 }
 function wireBuyLinks(root){
   root.querySelectorAll("[data-buy]").forEach(a=>a.onclick=e=>{
