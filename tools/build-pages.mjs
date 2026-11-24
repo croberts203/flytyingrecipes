@@ -9,7 +9,7 @@ const SITE = "https://app.flytyingrecipes.org";
 const SUPABASE_URL = "https://rkxzfzzjzrnkiyopbdke.supabase.co";
 const SUPABASE_KEY = "sb_publishable_ypQ91HrykMCwgI59OCRFYg_MFGOgzi9";
 const FORECAST = "https://fishforecast.net";
-const FC_SP = {1:"redfish",2:"trout",3:"flounder",4:"blackdrum",5:"sheepshead",6:"pompano",7:"whiting",8:"snook",9:"tarpon",10:"cobia",11:"jack",13:"spanish",14:"bluefish",15:"bass",16:"bream",17:"redear",18:"bream",19:"crappie",20:"catfish",21:"rainbow",22:"brown",23:"brook",25:"pike"};
+const FC_SP = {1:"redfish",2:"trout",3:"flounder",4:"blackdrum",5:"sheepshead",6:"pompano",7:"whiting",8:"snook",9:"tarpon",10:"cobia",11:"jack",13:"spanish",14:"bluefish",15:"bass",16:"bream",17:"redear",18:"bream",19:"crappie",20:"catfish",21:"rainbow",22:"brown",23:"brook",25:"pike",26:"smallmouth",27:"carp",28:"shad",29:"striper",30:"bonefish",31:"permit"};
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

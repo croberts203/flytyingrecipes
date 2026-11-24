@@ -307,7 +307,7 @@ const uid = () => crypto.randomUUID();
 const spSlug = n => String(n||"").replace(/ \(.+\)/,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
 // Fly Bench species id -> Fish Bite Forecast species id
 const FORECAST = "https://fishforecast.net";
-const FC_SP = {1:"redfish",2:"trout",3:"flounder",4:"blackdrum",5:"sheepshead",6:"pompano",7:"whiting",8:"snook",9:"tarpon",10:"cobia",11:"jack",13:"spanish",14:"bluefish",15:"bass",16:"bream",17:"redear",18:"bream",19:"crappie",20:"catfish",21:"rainbow",22:"brown",23:"brook",25:"pike"};
+const FC_SP = {1:"redfish",2:"trout",3:"flounder",4:"blackdrum",5:"sheepshead",6:"pompano",7:"whiting",8:"snook",9:"tarpon",10:"cobia",11:"jack",13:"spanish",14:"bluefish",15:"bass",16:"bream",17:"redear",18:"bream",19:"crappie",20:"catfish",21:"rainbow",22:"brown",23:"brook",25:"pike",26:"smallmouth",27:"carp",28:"shad",29:"striper",30:"bonefish",31:"permit"};
 const forecastLink = sp => sp && FC_SP[sp.id] ? `<a class="fclink" href="${FORECAST}/#bite=${FC_SP[sp.id]}" target="_blank" rel="noopener"><span class="fcico">${window.FBFish?FBFish.svg(sp.common_name):""}</span><span><b>Are ${esc(sp.common_name.replace(/ \(.+\)/,""))} biting?</b><br><span class="small">Tides, weather and best times near you on Fish Bite Forecast</span></span><span class="fcgo">›</span></a>` : "";
 const fmtDate = d => new Date(d).toLocaleString([], {month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit"});
 function requireUser(){ if(!S.user){ openAuth(); return false; } return true; }
