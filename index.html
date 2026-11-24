@@ -700,6 +700,8 @@ function openFly(id){
     ${!f.cover_photo_path && !f.youtube_url ? photoCredit(f) : ""}
     <div class="row"><h2 class="grow">${esc(f.name)}</h2>${favBtn(f.id,true)}${mine?`<button class="btn sm alt" id="editF">Edit</button>`:""}</div>
     <div class="small muted" style="margin:4px 0 8px">${esc(f.fly_type||"")} · ${esc(f.difficulty||"")} · Hooks ${esc(f.hook_sizes||"—")}<br>${f.is_starter?"Starter pattern":`Shared by ${esc(f.author?.display_name||"a member")}`}</div>
+    ${(()=>{ const par=f.variant_of&&S.flies.find(x=>x.id===f.variant_of); const kids=S.flies.filter(x=>x.variant_of===f.id); return `${par?`<p class="small" style="margin:0 0 6px">↳ Variant of <a href="#fly=${par.id}" data-openfly="${par.id}">${esc(par.name)}</a></p>`:""}${kids.length?`<p class="small" style="margin:0 0 6px">Tyers' variants: ${kids.map(k=>`<a href="#fly=${k.id}" data-openfly="${k.id}">${esc(k.name)}</a>`).join(" · ")}</p>`:""}`; })()}
+    <button class="btn sm alt" id="mkVar" style="margin:0 0 8px">✎ Make my variant</button>
     <div>${sp.map(x=>`<span class="tag">${esc(x.common_name)}</span>`).join("")}</div>
     ${creatorBlock(f)}
     ${f.description?`<p>${esc(f.description)}</p>`:""}
@@ -735,6 +737,8 @@ function openFly(id){
     if(error && error.code!=="23505") return toast("Couldn't hide this member.");
     s.remove(); S.flies=null; toast("Hidden"); renderFlies(); };
   if($("#editF",s)) $("#editF",s).onclick=()=>{ s.remove(); editFly(f); };
+  $("#mkVar",s).onclick=()=>{ if(!requireUser()) return; s.remove(); editFly(f, {variant:true}); };
+  s.querySelectorAll("[data-openfly]").forEach(a=>a.onclick=e=>{ e.preventDefault(); s.remove(); openFly(Number(a.dataset.openfly)); });
   if($("#copyNeed",s)) $("#copyNeed",s).onclick=async()=>{ const txt=`${f.name} – need:\n`+needList.map(m=>`• ${m.material_text}`).join("\n"); try{ await navigator.clipboard.writeText(txt); toast("Shopping list copied"); }catch{ sheet(`<h3>Shopping list</h3><textarea style="min-height:180px">${esc(txt)}</textarea>`); } };
 }
 
@@ -792,15 +796,20 @@ function welcome(){
   draw();
 }
 
-function editFly(f=null){
-  const isNew = !f;
+function editFly(f=null, opt={}){
+  const parent = opt.variant ? f : null;
+  if(parent){ f = { ...parent, id:undefined, name:`${parent.name} (my variant)`, is_public:false, is_starter:false, author_id:undefined,
+    creator_name:(`Variant of ${parent.name}`+(parent.creator_name?` (${parent.creator_name})`:"")).slice(0,120), creator_url:null,
+    fly_materials:(parent.fly_materials||[]).map(m=>({...m, id:undefined, _orig:m.material_text})), fly_steps:(parent.fly_steps||[]).map(x=>({...x, id:undefined})) }; }
+  const isNew = !f || !!parent;
   f = f || { name:"", fly_type:"", water_type:"salt", hook_sizes:"", difficulty:"beginner", description:"", fishing_tips:"", tutorial_links:[], is_public:true, fly_species:[], fly_materials:[], fly_steps:[], cover_photo_path:null, youtube_url:null };
   const mats = [...(f.fly_materials||[])].sort((a,b)=>a.sort-b.sort).map(m=>({...m}));
   const steps = [...(f.fly_steps||[])].sort((a,b)=>a.step_no-b.step_no).map(st=>({...st}));
   const spSel = new Set((f.fly_species||[]).map(x=>x.species_id));
   let cover = f.cover_photo_path, coverFile=null;
   const links = (f.tutorial_links||[]).map(l=>l.url).join("\n");
-  const s = sheet(`<h2>${isNew?"New recipe":"Edit recipe"}</h2>
+  const s = sheet(`<h2>${parent?"Make your variant":isNew?"New recipe":"Edit recipe"}</h2>
+    ${parent?`<div class="card" style="background:#e9f2ea;margin-top:4px"><p class="small" style="margin:0">Copied from <b>${esc(parent.name)}</b>. Swap a material or two (changed ones turn green), tweak any steps, then save. It stays private unless you tick "Share with everyone", and it links back to the original.</p></div>`:""}
     <label>Fly name</label><input type="text" id="eName" value="${esc(f.name)}">
     <div class="row"><div class="grow"><label>Type</label><input type="text" id="eType" placeholder="Baitfish, shrimp, crab, popper…" value="${esc(f.fly_type||"")}"></div>
       <div class="grow"><label>Water</label><select id="eWater">${["salt","fresh","both"].map(w=>`<option ${f.water_type===w?"selected":""} value="${w}">${w==="both"?"Salt + fresh":w[0].toUpperCase()+w.slice(1)}</option>`).join("")}</select></div></div>
@@ -826,10 +835,10 @@ function editFly(f=null){
     <label class="row" style="gap:8px;color:var(--ink);font-size:.9rem"><input type="checkbox" id="ePub" ${f.is_public?"checked":""} style="width:auto"> Share with everyone</label>
     <p class="small muted">Only upload photos you took yourself, and only link videos that are public on YouTube. Credit any pattern originator in the description.</p>
     <div class="row" style="margin-top:12px"><button class="btn grow" id="eSave">Save recipe</button>${!isNew?`<button class="btn danger" id="eDel">Delete</button>`:""}</div>`);
-  const drawMats = () => { $("#eMats",s).innerHTML = mats.map((m,i)=>`<div class="edit-row" data-i="${i}">
+  const drawMats = () => { $("#eMats",s).innerHTML = mats.map((m,i)=>`<div class="edit-row" data-i="${i}" ${parent&&m._orig!==undefined&&m.material_text!==m._orig?'style="background:#e9f2ea"':parent&&m._orig===undefined?'style="background:#e9f2ea"':""}>
       <div class="row"><input type="text" placeholder="Part (tail, body…)" data-k="part" value="${esc(m.part||"")}" style="flex:1"><select data-k="category" style="flex:1">${CATEGORIES.map(c=>`<option value="${c}" ${m.category===c?"selected":""}>${CAT_LABEL[c]}</option>`).join("")}</select></div>
       <div class="row" style="margin-top:6px"><input type="text" placeholder="Material (e.g. Bucktail, chartreuse)" data-k="material_text" value="${esc(m.material_text||"")}"><button class="btn ghost" data-del>✕</button></div></div>`).join("") || `<p class="small muted">No materials yet.</p>`;
-    $("#eMats",s).querySelectorAll(".edit-row").forEach(r=>{ const i=+r.dataset.i; r.querySelectorAll("[data-k]").forEach(inp=>inp.oninput=inp.onchange=()=>mats[i][inp.dataset.k]=inp.value); r.querySelector("[data-del]").onclick=()=>{ mats.splice(i,1); drawMats(); }; }); };
+    $("#eMats",s).querySelectorAll(".edit-row").forEach(r=>{ const i=+r.dataset.i; r.querySelectorAll("[data-k]").forEach(inp=>inp.oninput=inp.onchange=()=>{ mats[i][inp.dataset.k]=inp.value; if(parent) r.style.background=(mats[i]._orig===undefined||mats[i].material_text!==mats[i]._orig)?"#e9f2ea":""; }); r.querySelector("[data-del]").onclick=()=>{ mats.splice(i,1); drawMats(); }; }); };
   const drawSteps = () => { $("#eSteps",s).innerHTML = steps.map((st,i)=>`<div class="edit-row" data-i="${i}">
       <div class="row"><b>${i+1}.</b><span class="grow"></span><button class="btn ghost" data-up ${i===0?"disabled":""}>↑</button><button class="btn ghost" data-del>✕</button></div>
       <textarea data-k="instruction" placeholder="What to do in this step">${esc(st.instruction||"")}</textarea>
@@ -879,7 +888,7 @@ function editFly(f=null){
         difficulty:$("#eDiff",s).value, description:$("#eDesc",s).value.trim(), fishing_tips:$("#eTips",s).value.trim(), imitates:$("#eImit",s).value.trim()||null, hatch:$("#eHatch",s).value.trim()||null,
         tutorial_links: $("#eLinks",s).value.split(/\s+/).filter(u=>/^https?:\/\//.test(u)).map(url=>({label:url.replace(/^https?:\/\/(www\.)?/,"").split("/")[0], url})),
         is_public:$("#ePub",s).checked, cover_photo_path:cover, youtube_url:yt?ytCanon(yt):null,
-        creator_name:$("#eCred",s).value.trim()||null, creator_url:credUrl||null };
+        creator_name:$("#eCred",s).value.trim()||null, creator_url:credUrl||null, ...(parent?{variant_of:parent.id, photo_url:parent.photo_url||null, photo_credit:parent.photo_credit||null}:{}) };
       let id = f.id;
       if(isNew){ const { data, error } = await sb.from("flies").insert(row).select("id").single(); if(error) throw error; id=data.id; }
       else { const { error } = await sb.from("flies").update(row).eq("id", id); if(error) throw error;
