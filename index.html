@@ -984,7 +984,7 @@ const LOCAL_SHOPS = [
 const HOME_POINT = { lat:30.2900, lng:-81.5200, label:"Jacksonville, FL" };
 const milesBetween=(a,b)=>{ const R=3958.8, r=x=>x*Math.PI/180, dLat=r(b.lat-a.lat), dLng=r(b.lng-a.lng); const h=Math.sin(dLat/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLng/2)**2; return 2*R*Math.asin(Math.sqrt(h)); };
 const shopOrigin = () => lsGet("fb_loc", null) || HOME_POINT;
-const RADII = [20,30,50,75,100,200,300,400,500];
+const RADII = [10,20,30,50,100,150,200];
 const shopRadius = () => RADII.includes(+lsGet("fb_radius",200)) ? +lsGet("fb_radius",200) : 200;
 async function openPriceSheet(it){
   const q = cleanBuy(it.label); const origin = shopOrigin(); const rad = shopRadius();
