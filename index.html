@@ -261,7 +261,7 @@ const FISH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const S = {
   user:null, profile:null, tab:"flies",
   species:[], regs:{}, flies:null, inventory:[], catches:null,
-  flyFilter:{species:"", water:"", q:"", canTie:false, mine:false, favs:false}, favs:new Set(),
+  flyFilter:{species:"", water:"", q:"", canTie:false, mine:false, favs:false, type:"", bug:"", season:"", diff:"", hooks:"", video:false}, favs:new Set(),
 };
 
 /* ---------------- helpers ---------------- */
@@ -578,6 +578,34 @@ async function render(){
 function fab(label, fn){ document.querySelectorAll(".fab").forEach(f=>f.remove()); const b=document.createElement("button"); b.className="btn brass fab"; b.textContent=label; b.onclick=fn; document.body.appendChild(b); }
 
 /* ================= FLIES ================= */
+// Search properties derived from each recipe's text, so new recipes are filterable without extra data entry.
+const FLY_TYPES = [["dry","Dry fly",/dry|dun|spinner|parachute|wulff|humpy|caddis \(adult\)|sedge|hopper|terrestrial|beetle|ant\b/],["emerger","Emerger",/emerger|cripple/],["nymph","Nymph",/nymph|pupa|larva|buzzer|midge|worm|bloodworm|scud|bug\b/],["wet","Wet fly / soft hackle",/wet|soft hackle|spider|palmer/],["streamer","Streamer / lure",/streamer|lure|bugger|leech|zonker|minnow|fry|baitfish|tadpole|sculpin/],["terrestrial","Terrestrial",/terrestrial|hopper|beetle|ant\b|cricket|daddy|dung/],["salmon","Salmon & steelhead",/salmon|steelhead|spey/],["egg","Egg",/\begg\b/],["salt","Saltwater",/salt|tarpon|bonefish|crab|shrimp/],["bass","Popper / bass bug",/popper|bass bug|diver|slider|gurgler|bug \(/],["pike","Pike & musky",/pike|musky/]];
+const BUGS = [["mayfly","Mayflies",/mayfly|dun\b|spinner|olive|baetis|pmd|trico|hendrickson|cahill|march brown|sulphur|drake/],["caddis","Caddis / sedges",/caddis|sedge/],["stonefly","Stoneflies",/stonefly|stone\b|salmonfly|sally|february red/],["midge","Midges & buzzers",/midge|chironomid|buzzer|bloodworm/],["terrestrial","Terrestrials",/terrestrial|hopper|grasshopper|beetle|ant\b|ants\b|cricket|daddy|cranefly|heather fly|dung fly/],["damsel","Damsels & dragonflies",/damsel|dragonfl/],["baitfish","Baitfish & fry",/baitfish|minnow|fry|smelt|sculpin|mullet|anchov|shad\b|pilchard/],["crustacean","Shrimp, crabs & crayfish",/shrimp|scud|crab|crayfish|sow bug|cressbug|corixa|gammarus/],["leech","Leeches, worms & eggs",/leech|worm|egg|annelid/],["attractor","Attractors",/attractor/]];
+const SEASONS = [["spring","Spring",/spring|march|april|may\b|ice-out/],["summer","Summer",/summer|june|july|august/],["autumn","Autumn / fall",/autumn|fall\b|september|october|november/],["winter","Winter",/winter|december|january|february/]];
+const flyText = f => `${f.name} ${f.fly_type||""} ${f.description||""} ${f.imitates||""}`.toLowerCase();
+const matches = (rx, t) => rx.test(t);
+function flyHas(f, list, key){ const row=list.find(x=>x[0]===key); if(!row) return true; const t = list===SEASONS ? `${f.hatch||""} ${f.fishing_tips||""}`.toLowerCase() : list===FLY_TYPES ? `${f.fly_type||""} ${f.name}`.toLowerCase() : flyText(f);
+  if(list===SEASONS && /all (year|season)/.test(t)) return true; return matches(row[2], t); }
+const filterCount = F => ["type","bug","diff","season","hooks"].filter(k=>F[k]).length + (F.video?1:0);
+function openFilters(){
+  const F=S.flyFilter; const opt=(list,val)=>list.map(([k,l])=>`<option value="${k}" ${val===k?"selected":""}>${l}</option>`).join("");
+  const spOpts = S.species.filter(sp=>S.flies.some(f=>(f.fly_species||[]).some(x=>x.species_id===sp.id))).sort((a,b)=>a.common_name.localeCompare(b.common_name));
+  const s=sheet(`<h2>Search filters</h2>
+    <label>Target species</label><select id="xSp"><option value="">Any fish</option>${spOpts.map(sp=>`<option value="${sp.id}" ${String(F.species)===String(sp.id)?"selected":""}>${esc(sp.common_name)}</option>`).join("")}</select>
+    <label>Fly type</label><select id="xType"><option value="">Any type</option>${opt(FLY_TYPES,F.type)}</select>
+    <label>What it imitates</label><select id="xBug"><option value="">Anything</option>${opt(BUGS,F.bug)}</select>
+    <label>Season / hatch</label><select id="xSeason"><option value="">Any time</option>${opt(SEASONS,F.season)}</select>
+    <label>Difficulty</label><select id="xDiff"><option value="">Any</option><option value="beginner" ${F.diff==="beginner"?"selected":""}>Beginner</option><option value="intermediate" ${F.diff==="intermediate"?"selected":""}>Intermediate</option><option value="advanced" ${F.diff==="advanced"?"selected":""}>Advanced</option></select>
+    <label>Water</label><select id="xWater"><option value="">Fresh or salt</option><option value="fresh" ${F.water==="fresh"?"selected":""}>Freshwater</option><option value="salt" ${F.water==="salt"?"selected":""}>Saltwater</option></select>
+    <label>Hook size</label><select id="xHooks"><option value="">Any size</option><option value="big" ${F.hooks==="big"?"selected":""}>Big (#8 and larger)</option><option value="mid" ${F.hooks==="mid"?"selected":""}>Medium (#10–16)</option><option value="small" ${F.hooks==="small"?"selected":""}>Small (#18 and smaller)</option></select>
+    <label class="row" style="gap:8px;margin-top:12px"><input type="checkbox" id="xVid" ${F.video?"checked":""} style="width:auto"> Has a tying video</label>
+    <div class="row" style="gap:8px;margin-top:16px"><button class="btn alt grow" id="xClear">Clear all</button><button class="btn grow" id="xGo">Show flies</button></div>`);
+  $("#xClear",s).onclick=()=>{ Object.assign(F,{species:"",type:"",bug:"",season:"",diff:"",water:"",hooks:"",video:false}); s.remove(); renderFlies(); };
+  $("#xGo",s).onclick=()=>{ Object.assign(F,{species:$("#xSp",s).value,type:$("#xType",s).value,bug:$("#xBug",s).value,season:$("#xSeason",s).value,diff:$("#xDiff",s).value,water:$("#xWater",s).value,hooks:$("#xHooks",s).value,video:$("#xVid",s).checked}); s.remove(); renderFlies(); window.scrollTo(0,0); };
+}
+// Hook sizes like "#12–18 dry", "2/0", "#4–10". Bigger hooks have smaller numbers; aught sizes count as big.
+function hookBand(f, band){ const t=(f.hook_sizes||""); const nums=[...t.matchAll(/(\d+)\/0|#?(\d+)/g)].map(m=>m[1]?-Number(m[1]):Number(m[2])).filter(n=>n<=32); if(!nums.length) return true;
+  const lo=Math.min(...nums), hi=Math.max(...nums); if(band==="big") return lo<=8; if(band==="mid") return hi>=10 && lo<=16; if(band==="small") return hi>=18; return true; }
 async function renderFlies(){
   if(!S.flies){ view.innerHTML=`<div class="empty"><span class="spinner"></span></div>`; await loadFlies(); }
   const F = S.flyFilter;
@@ -594,7 +622,13 @@ async function renderFlies(){
   let list = S.flies.filter(f => {
     if(F.species && !(f.fly_species||[]).some(x=>String(x.species_id)===String(F.species))) return false;
     if(F.water && !(f.water_type===F.water || f.water_type==="both")) return false;
-    if(F.q && !(`${f.name} ${f.fly_type} ${f.description}`.toLowerCase().includes(F.q.toLowerCase()))) return false;
+    if(F.q && !(`${f.name} ${f.fly_type} ${f.description} ${f.imitates||""} ${f.creator_name||""} ${(f.fly_materials||[]).map(m=>m.material_text).join(" ")}`.toLowerCase().includes(F.q.toLowerCase()))) return false;
+    if(F.type && !flyHas(f, FLY_TYPES, F.type)) return false;
+    if(F.bug && !flyHas(f, BUGS, F.bug)) return false;
+    if(F.season && !flyHas(f, SEASONS, F.season)) return false;
+    if(F.diff && f.difficulty!==F.diff) return false;
+    if(F.hooks && !hookBand(f, F.hooks)) return false;
+    if(F.video && !(f.youtube_url || (f.fly_steps||[]).some(x=>x.youtube_url))) return false;
     if(F.canTie && !canTie(f)) return false;
     if(F.mine && f.author_id !== S.user?.id) return false;
     if(F.favs && !S.favs.has(f.id)) return false;
@@ -602,13 +636,14 @@ async function renderFlies(){
   });
   const banner = `<div class="banner"><h2>${S.user?"What are you tying today?":"Tie it. Fish it. Log it."}</h2><p>${S.user?"Recipes sorted by the fish you're after, matched to the materials on your bench.":"Free fly recipes sorted by species. Sign in to track your materials and see what you can tie right now."}</p>${S.user?"":`<button class="btn sm" id="bnSign">Sign in free</button>`}</div>`;
   view.innerHTML = banner + `
-    <input type="search" id="fq" placeholder="Search flies…" value="${esc(F.q)}">
+    <input type="search" id="fq" placeholder="Search flies, materials, insects…" value="${esc(F.q)}">
     <div style="height:8px"></div>
     ${spPicker}
     <div class="chips" style="margin-top:4px">
       <span class="chip ${!F.water?"on":""}" data-w="">All water</span>
       <span class="chip ${F.water==="salt"?"on":""}" data-w="salt">Saltwater</span>
       <span class="chip ${F.water==="fresh"?"on":""}" data-w="fresh">Freshwater</span>
+      <span class="chip ${filterCount(F)?"on":""}" id="ffilt">⚙ Filters${filterCount(F)?` (${filterCount(F)})`:""}</span>
       <span class="chip ${F.favs?"on":""}" id="ffav">♥ Favorites${S.favs.size?` (${S.favs.size})`:""}</span>
       ${S.user?`<span class="chip ${F.canTie?"on":""}" id="fcan">Can tie now</span><span class="chip ${F.mine?"on":""}" id="fmine">My recipes</span>`:""}
     </div>
@@ -616,7 +651,7 @@ async function renderFlies(){
     <p class="small muted">${list.length} ${list.length===1?"fly":"flies"}</p>
     <div id="flist">${list.map(flyCard).join("") || (F.favs && !S.favs.size ? emptyNice(FLY_ICON, "No favorites yet", "Tap the heart on any recipe to save it here.", "fClear", "Show all recipes") : emptyNice(FLY_ICON, "No flies match", "Try a different search, or clear the filters to see every recipe.", "fClear", "Clear filters"))}</div>`;
   if($("#bnSign")) $("#bnSign").onclick=openAuth;
-  if($("#fClear")) $("#fClear").onclick=()=>{ Object.assign(F,{q:"",species:"",water:"",canTie:false,mine:false,favs:false}); renderFlies(); };
+  if($("#fClear")) $("#fClear").onclick=()=>{ Object.assign(F,{q:"",species:"",water:"",canTie:false,mine:false,favs:false,type:"",bug:"",season:"",diff:"",hooks:"",video:false}); renderFlies(); };
   $("#fq").oninput = e => { F.q=e.target.value; clearTimeout(renderFlies.t); renderFlies.t=setTimeout(()=>{ renderFlies().then(()=>{ const i=$("#fq"); i.focus(); i.setSelectionRange(i.value.length,i.value.length); }); }, 250); };
   const pick=$("#fsp"); if(pick){ pick.scrollLeft = renderFlies.sl||0;
     const on=pick.querySelector(".fishchip.on"); if(on && !renderFlies.sl && on.dataset.sp) on.scrollIntoView({inline:"center", block:"nearest"});
@@ -625,6 +660,7 @@ async function renderFlies(){
   if($("#fcan")) $("#fcan").onclick=()=>{ F.canTie=!F.canTie; renderFlies(); };
   if($("#fmine")) $("#fmine").onclick=()=>{ F.mine=!F.mine; renderFlies(); };
   if($("#ffav")) $("#ffav").onclick=()=>{ F.favs=!F.favs; renderFlies(); };
+  if($("#ffilt")) $("#ffilt").onclick=openFilters;
   view.querySelectorAll("[data-fly]").forEach(el=>el.onclick=()=>openFly(Number(el.dataset.fly)));
   fab("+ Add recipe", ()=>{ if(requireUser()) editFly(); });
 }
