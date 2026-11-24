@@ -154,6 +154,10 @@ ol.steps img{width:100%;border-radius:10px;margin-top:8px}
 .matthumb.sm svg{width:18px;height:18px}
 .credit{margin:-6px 0 10px}
 .credit a{color:inherit}
+.favbtn{position:absolute;top:6px;right:6px;z-index:2;width:38px;height:38px;border-radius:999px;border:0;background:rgba(255,255,255,.92);display:grid;place-items:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.18);padding:0}
+.favbtn svg{width:20px;height:20px;fill:none;stroke:#b3263a;stroke-width:2}.favbtn.on svg{fill:#d7263d;stroke:#d7263d}
+.favbtn.big{position:static;width:auto;height:36px;padding:0 12px;gap:6px;display:inline-flex;align-items:center;margin-right:8px;font:700 .85rem/1 var(--body);color:#b3263a;border:1px solid #f0c9cf;box-shadow:none}
+.favbtn.on.big{background:#fde8eb}
 .media-tag{position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.65);color:#fff;font:700 .7rem/1 var(--body);padding:4px 7px;border-radius:999px}
 .thumb{position:relative}
 .req{color:#b3412e}
@@ -257,7 +261,7 @@ const FISH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const S = {
   user:null, profile:null, tab:"flies",
   species:[], regs:{}, flies:null, inventory:[], catches:null,
-  flyFilter:{species:"", water:"", q:"", canTie:false, mine:false},
+  flyFilter:{species:"", water:"", q:"", canTie:false, mine:false, favs:false}, favs:new Set(),
 };
 
 /* ---------------- helpers ---------------- */
@@ -464,13 +468,40 @@ function useMaterials(f, count=1){
 function canTie(f){ if(!S.user) return false; const mats=f.fly_materials||[]; return mats.length>0 && mats.every(m => { const st=matStatus(m); return st==="have" || (st==="maybe" && SUBBABLE.has(m.category)); }); }
 
 /* ---------------- auth ---------------- */
-async function refreshUser(){
+async function refreshUser(){ await refreshUserCore(); await loadFavs().catch(()=>{}); }
+async function refreshUserCore(){
   const { data: { session } } = await sb.auth.getSession();
   S.user = session?.user || null;
   if(S.user){ const { data } = await sb.from("profiles").select("*").eq("id", S.user.id).maybeSingle(); S.profile = data; }
   else S.profile = null;
   $("#acctBtn").textContent = S.user ? (S.profile?.display_name || "Account") : "Sign in";
 }
+/* ---------------- favorites ---------------- */
+// Signed in: saved to the account (fly_favorites). Signed out: kept on this device and moved to the account at sign-in.
+async function loadFavs(){
+  const local = lsGet("fb_favs", []);
+  if(!S.user){ S.favs = new Set(local); return; }
+  const { data } = await sb.from("fly_favorites").select("fly_id");
+  S.favs = new Set((data||[]).map(x=>x.fly_id));
+  const extra = local.filter(id=>!S.favs.has(id));
+  if(extra.length && !DEMO){ const { error } = await sb.from("fly_favorites").insert(extra.map(fly_id=>({ fly_id }))); if(!error) extra.forEach(id=>S.favs.add(id)); }
+  if(!DEMO) lsSet("fb_favs", []);
+}
+async function toggleFav(id){
+  const on = !S.favs.has(id);
+  on ? S.favs.add(id) : S.favs.delete(id);
+  document.querySelectorAll(`[data-fav="${id}"]`).forEach(b=>{ b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); b.title = on ? "Remove from favorites" : "Add to favorites"; const t=b.querySelector(".favt"); if(t) t.textContent = on ? "Saved" : "Save"; });
+  navigator.vibrate?.(8);
+  if(!S.user){ lsSet("fb_favs", [...S.favs]); toast(on ? "Saved to favorites on this device. Sign in to keep them on every device." : "Removed from favorites"); return; }
+  const q = on ? sb.from("fly_favorites").insert({ fly_id:id }) : sb.from("fly_favorites").delete().eq("fly_id", id);
+  const { error } = await q;
+  if(error){ on ? S.favs.delete(id) : S.favs.add(id); toast("Couldn't update favorites. Try again."); }
+  else toast(on ? "Saved to favorites" : "Removed from favorites");
+  if(S.tab==="flies" && S.flyFilter.favs && !on) renderFlies();
+}
+const HEART = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.4.7-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg>`;
+const favBtn = (id, big) => { const on = S.favs.has(id); return `<button type="button" class="favbtn${big?" big":""}${on?" on":""}" data-fav="${id}" aria-pressed="${on}" title="${on?"Remove from favorites":"Add to favorites"}">${HEART}${big?`<span class="favt">${on?"Saved":"Save"}</span>`:""}</button>`; };
+document.addEventListener("click", e=>{ const b=e.target.closest("[data-fav]"); if(!b) return; e.stopPropagation(); e.preventDefault(); toggleFav(Number(b.dataset.fav)); }, true);
 function openAuth(){
   const s = sheet(`
     <h2>Sign in</h2>
@@ -566,6 +597,7 @@ async function renderFlies(){
     if(F.q && !(`${f.name} ${f.fly_type} ${f.description}`.toLowerCase().includes(F.q.toLowerCase()))) return false;
     if(F.canTie && !canTie(f)) return false;
     if(F.mine && f.author_id !== S.user?.id) return false;
+    if(F.favs && !S.favs.has(f.id)) return false;
     return true;
   });
   const banner = `<div class="banner"><h2>${S.user?"What are you tying today?":"Tie it. Fish it. Log it."}</h2><p>${S.user?"Recipes sorted by the fish you're after, matched to the materials on your bench.":"Free fly recipes sorted by species. Sign in to track your materials and see what you can tie right now."}</p>${S.user?"":`<button class="btn sm" id="bnSign">Sign in free</button>`}</div>`;
@@ -577,13 +609,14 @@ async function renderFlies(){
       <span class="chip ${!F.water?"on":""}" data-w="">All water</span>
       <span class="chip ${F.water==="salt"?"on":""}" data-w="salt">Saltwater</span>
       <span class="chip ${F.water==="fresh"?"on":""}" data-w="fresh">Freshwater</span>
+      <span class="chip ${F.favs?"on":""}" id="ffav">♥ Favorites${S.favs.size?` (${S.favs.size})`:""}</span>
       ${S.user?`<span class="chip ${F.canTie?"on":""}" id="fcan">Can tie now</span><span class="chip ${F.mine?"on":""}" id="fmine">My recipes</span>`:""}
     </div>
     ${F.species?forecastLink(speciesById(Number(F.species))):""}
     <p class="small muted">${list.length} ${list.length===1?"fly":"flies"}</p>
-    <div id="flist">${list.map(flyCard).join("") || emptyNice(FLY_ICON, "No flies match", "Try a different search, or clear the filters to see every recipe.", "fClear", "Clear filters")}</div>`;
+    <div id="flist">${list.map(flyCard).join("") || (F.favs && !S.favs.size ? emptyNice(FLY_ICON, "No favorites yet", "Tap the heart on any recipe to save it here.", "fClear", "Show all recipes") : emptyNice(FLY_ICON, "No flies match", "Try a different search, or clear the filters to see every recipe.", "fClear", "Clear filters"))}</div>`;
   if($("#bnSign")) $("#bnSign").onclick=openAuth;
-  if($("#fClear")) $("#fClear").onclick=()=>{ Object.assign(F,{q:"",species:"",water:"",canTie:false,mine:false}); renderFlies(); };
+  if($("#fClear")) $("#fClear").onclick=()=>{ Object.assign(F,{q:"",species:"",water:"",canTie:false,mine:false,favs:false}); renderFlies(); };
   $("#fq").oninput = e => { F.q=e.target.value; clearTimeout(renderFlies.t); renderFlies.t=setTimeout(()=>{ renderFlies().then(()=>{ const i=$("#fq"); i.focus(); i.setSelectionRange(i.value.length,i.value.length); }); }, 250); };
   const pick=$("#fsp"); if(pick){ pick.scrollLeft = renderFlies.sl||0;
     const on=pick.querySelector(".fishchip.on"); if(on && !renderFlies.sl && on.dataset.sp) on.scrollIntoView({inline:"center", block:"nearest"});
@@ -591,6 +624,7 @@ async function renderFlies(){
   view.querySelectorAll("[data-w]").forEach(c=>c.onclick=()=>{ F.water=c.dataset.w; renderFlies(); });
   if($("#fcan")) $("#fcan").onclick=()=>{ F.canTie=!F.canTie; renderFlies(); };
   if($("#fmine")) $("#fmine").onclick=()=>{ F.mine=!F.mine; renderFlies(); };
+  if($("#ffav")) $("#ffav").onclick=()=>{ F.favs=!F.favs; renderFlies(); };
   view.querySelectorAll("[data-fly]").forEach(el=>el.onclick=()=>openFly(Number(el.dataset.fly)));
   fab("+ Add recipe", ()=>{ if(requireUser()) editFly(); });
 }
@@ -599,7 +633,7 @@ function flyCard(f){
   const img = flyThumb(f);
   const tie = S.user && S.inventory.length ? (canTie(f) ? `<span class="small have">● Can tie</span>` : "") : "";
   return `<div class="card flycard big" data-fly="${f.id}">
-    <div class="pic${img?"":" noimg"}" style="${img?`background-image:url('${img}')`:""}">${img?"":FLY_ICON}${f.youtube_url||(f.fly_steps||[]).some(x=>x.youtube_url)?`<span class="media-tag">▶ Video</span>`:""}${tie?`<span class="cantie">✓ You can tie this</span>`:""}</div>
+    <div class="pic${img?"":" noimg"}" style="${img?`background-image:url('${img}')`:""}">${img?"":FLY_ICON}${favBtn(f.id)}${f.youtube_url||(f.fly_steps||[]).some(x=>x.youtube_url)?`<span class="media-tag">▶ Video</span>`:""}${tie?`<span class="cantie">✓ You can tie this</span>`:""}</div>
     <div class="body">
       <h3>${esc(f.name)}</h3>
       ${f.creator_name?`<div class="by">by ${esc(f.creator_name)}</div>`:""}
@@ -618,7 +652,7 @@ function openFly(id){
   const s = sheet(`
     ${f.youtube_url && f.creator_name ? `<a href="${esc(ytWatchUrl(f.youtube_url))}" target="_blank" rel="noopener" class="hero-link"><img class="hero" src="${esc(img||ytThumb(f.youtube_url))}" alt="${esc(f.name)}"><span class="hero-play">▶</span></a>` : f.youtube_url?ytEmbed(f.youtube_url,"hero"):img?`<img class="hero${f.cover_photo_path?"":" fit"}" src="${img}" alt="${esc(f.name)}">`:""}
     ${!f.cover_photo_path && !f.youtube_url ? photoCredit(f) : ""}
-    <div class="row"><h2 class="grow">${esc(f.name)}</h2>${mine?`<button class="btn sm alt" id="editF">Edit</button>`:""}</div>
+    <div class="row"><h2 class="grow">${esc(f.name)}</h2>${favBtn(f.id,true)}${mine?`<button class="btn sm alt" id="editF">Edit</button>`:""}</div>
     <div class="small muted" style="margin:4px 0 8px">${esc(f.fly_type||"")} · ${esc(f.difficulty||"")} · Hooks ${esc(f.hook_sizes||"—")}<br>${f.is_starter?"Starter pattern":`Shared by ${esc(f.author?.display_name||"a member")}`}</div>
     <div>${sp.map(x=>`<span class="tag">${esc(x.common_name)}</span>`).join("")}</div>
     ${creatorBlock(f)}

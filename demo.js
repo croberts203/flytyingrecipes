@@ -25,7 +25,8 @@ const tables = {
     { id: 70004, caught_at: iso(14), lat: 30.1898, lng: -81.7432, location_name: "Neighborhood pond", species_id: 16, species_confirmed: true, length_in: 8, weight_lb: 0.5, fly_id: 11, kept: false, notes: null, region_code: "US-FL", region_name: "Florida", country_code: "US" },
     { id: 70005, caught_at: iso(21), lat: 30.1898, lng: -81.7432, location_name: "Neighborhood pond", species_id: 15, species_confirmed: true, length_in: 16, weight_lb: 2.4, fly_id: 12, kept: false, notes: null, region_code: "US-FL", region_name: "Florida", country_code: "US" }
   ].map(c => ({ user_id: "demo", species_other: null, ai_guess: null, ai_confidence: null, photo_path: null, created_at: c.caught_at, ...c })),
-  hidden_authors: [], ai_usage: [], inventory_events: []
+  hidden_authors: [], ai_usage: [], inventory_events: [],
+  fly_favorites: [{ user_id: "demo", fly_id: 4 }, { user_id: "demo", fly_id: 1 }, { user_id: "demo", fly_id: 7 }]
 };
 const LOCAL = new Set(Object.keys(tables));
 
