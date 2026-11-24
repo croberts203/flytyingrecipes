@@ -382,7 +382,9 @@ async function loadCatches(){
 const speciesById = id => S.species.find(s=>s.id===id);
 
 /* ---------------- material matching ---------------- */
-const STOP = new Set("with plus and the for or optional small medium large size sizes color colour e.g. similar sparse white black tan olive pink red few strands strand pair pairs".split(" "));
+const STOP = new Set("with plus and the for or optional small medium large size sizes color colour e.g. similar sparse white black tan olive pink red few strands strand pair pairs brown grey gray green yellow orange blue purple chartreuse natural dyed dark light fine thin thick long short turns tied wound bunch tuft tips fibres fibers optional".split(" "));
+// Categories where any stocked item can stand in (a hook is a hook); others need a name match to count as "can tie".
+const SUBBABLE = new Set(["hook","thread","glue","wire","flash","tool","other"]);
 const words = s => (s||"").toLowerCase().replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(w=>w.length>=4 && !STOP.has(w));
 function matStatus(fm){
   if(!S.user || !S.inventory.length) return null;
@@ -459,7 +461,7 @@ function useMaterials(f, count=1){
     toast(low ? `Bench updated. ${low} ${low===1?"item is":"items are"} running low: see Materials › Low / out.` : "Bench updated.", 4000);
     if(S.tab==="inventory") renderInventory(); };
 }
-function canTie(f){ if(!S.user) return false; const mats=f.fly_materials||[]; return mats.length>0 && mats.every(m => matStatus(m) !== "need"); }
+function canTie(f){ if(!S.user) return false; const mats=f.fly_materials||[]; return mats.length>0 && mats.every(m => { const st=matStatus(m); return st==="have" || (st==="maybe" && SUBBABLE.has(m.category)); }); }
 
 /* ---------------- auth ---------------- */
 async function refreshUser(){
@@ -542,7 +544,7 @@ async function render(){
   if(S.tab==="log") return renderLog();
   if(S.tab==="species") return renderSpecies();
 }
-function fab(label, fn){ const b=document.createElement("button"); b.className="btn brass fab"; b.textContent=label; b.onclick=fn; document.body.appendChild(b); }
+function fab(label, fn){ document.querySelectorAll(".fab").forEach(f=>f.remove()); const b=document.createElement("button"); b.className="btn brass fab"; b.textContent=label; b.onclick=fn; document.body.appendChild(b); }
 
 /* ================= FLIES ================= */
 async function renderFlies(){
@@ -1514,13 +1516,13 @@ sb.auth.onAuthStateChange((evt)=>{ if(evt==="SIGNED_IN"||evt==="SIGNED_OUT") aft
   if(location.hash==="#subscribe"){ history.replaceState(null,"",location.pathname); openSubscribe(); }
   if(location.hash==="#rules"){ history.replaceState(null,"",location.pathname); openNearbyRules(); }
   if(location.hash==="#phonescan"){ history.replaceState(null,"",location.pathname); if(S.user) setTimeout(()=>openScanner(), 300); else { toast("Sign in, then tap 📷 Scan barcode"); openAuth(); } }
-  const hfly = location.hash.match(/^#(?:fly|tie)=(\d+)/), hfish = (location.hash.match(/^#fish=([a-z0-9-]+)/)||[])[1] || new URLSearchParams(location.search).get("fish");
+  const wantTie = location.hash.startsWith("#tie="), hfly = location.hash.match(/^#(?:fly|tie)=(\d+)/), hfish = (location.hash.match(/^#fish=([a-z0-9-]+)/)||[])[1] || new URLSearchParams(location.search).get("fish");
   if(hfish){ const sp=S.species.find(x=>spSlug(x.common_name)===hfish || FC_SP[x.id]===hfish); if(sp){ S.flyFilter={...S.flyFilter, species:String(sp.id)}; S.tab="flies"; } history.replaceState(null,"",location.pathname); }
   const wantNew = location.hash==="#new";
   if(wantNew){ history.replaceState(null,"",location.pathname); S.tab="flies"; document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("on",x.dataset.tab==="flies")); }
   await render();
   if(wantNew){ if(S.user) editFly(); else { S.pendingNew=true; openAuth(); } }
-  if(hfly){ if(!S.flies) await loadFlies(); const f=S.flies.find(x=>x.id===+hfly[1]); if(f){ openFly(f.id); if(location.hash.startsWith("#tie=")) tieMode(f); } }
+  if(hfly){ if(!S.flies) await loadFlies(); const f=S.flies.find(x=>x.id===+hfly[1]); if(f){ openFly(f.id); if(wantTie) tieMode(f); } }
   let seen=true; try{ seen=!!localStorage.getItem("fb_welcomed"); }catch{}
   if(!seen && !DEMO && !hfly && !wantNew && !S.user && !document.querySelector(".sheet")) welcome();
 })();
