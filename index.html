@@ -970,7 +970,7 @@ const shopUrl = q => SHOPS[shopKey()].url(shopQuery(cleanBuy(q)));
 const pendingBuys = () => S.user ? lsGet("fb_pending_"+S.user.id, []) : [];
 const setPending = list => S.user && lsSet("fb_pending_"+S.user.id, list);
 function buyLink({ label, material_id=null, category="other" }){
-  return `<a class="buy" href="#" title="Fly shops within 200 miles" data-buy="${esc(JSON.stringify({label, material_id, category}))}">📍 Local shops</a>`;
+  return `<a class="buy" href="#" title="Fly shops near you" data-buy="${esc(JSON.stringify({label, material_id, category}))}">📍 Local shops</a>`;
 }
 const PRICE_FN = SUPABASE_URL + "/functions/v1/price-check";
 function trackBuy(it){ if(!S.user) return; it = {...it}; it.key = it.material_id ? "m"+it.material_id : "t"+it.label.toLowerCase(); it.at = Date.now(); setPending([...pendingBuys().filter(x=>x.key!==it.key), it]); }
@@ -984,20 +984,23 @@ const LOCAL_SHOPS = [
 const HOME_POINT = { lat:30.2900, lng:-81.5200, label:"Jacksonville, FL" };
 const milesBetween=(a,b)=>{ const R=3958.8, r=x=>x*Math.PI/180, dLat=r(b.lat-a.lat), dLng=r(b.lng-a.lng); const h=Math.sin(dLat/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLng/2)**2; return 2*R*Math.asin(Math.sqrt(h)); };
 const shopOrigin = () => lsGet("fb_loc", null) || HOME_POINT;
+const RADII = [25,50,100,200,300,500];
+const shopRadius = () => RADII.includes(+lsGet("fb_radius",200)) ? +lsGet("fb_radius",200) : 200;
 async function openPriceSheet(it){
-  const q = cleanBuy(it.label); const origin = shopOrigin();
-  const near = LOCAL_SHOPS.map(x=>({...x, mi:Math.round(milesBetween(origin,x))})).filter(x=>x.mi<=200).sort((a,b)=>a.mi-b.mi);
+  const q = cleanBuy(it.label); const origin = shopOrigin(); const rad = shopRadius();
+  const near = LOCAL_SHOPS.map(x=>({...x, mi:Math.round(milesBetween(origin,x))})).filter(x=>x.mi<=rad).sort((a,b)=>a.mi-b.mi);
   const s = sheet(`<h2>Local fly shops</h2><p class="small muted" style="margin:0 0 4px">${esc(q)}</p>
-    <p class="small muted" style="margin:0 0 8px">Within 200 miles of ${esc(origin.label)} · <a href="#" id="pcLoc">${lsGet("fb_loc",null)?"Update my location":"Use my location"}</a></p>
+    <p class="small muted" style="margin:0 0 8px">Within <select id="pcRad" style="width:auto;display:inline-block;padding:2px 6px;margin:0 2px">${RADII.map(r=>`<option value="${r}" ${r===rad?"selected":""}>${r} miles</option>`).join("")}</select> of ${esc(origin.label)} · <a href="#" id="pcLoc">${lsGet("fb_loc",null)?"Update my location":"Use my location"}</a></p>
     <div id="pcBody">${near.length?near.map((x,i)=>`<div class="card" style="margin:8px 0;padding:10px 12px">
       <div class="row"><b class="grow">${esc(x.name)}</b><span class="small muted">${x.mi} mi</span></div>
       <div class="small muted">${esc(x.addr)}</div>
       <div class="small" style="margin:4px 0">${esc(x.note)}</div>
       <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:6px"><a class="btn sm alt" href="tel:${x.phone.replace(/[^0-9]/g,"")}" data-trk>📞 ${esc(x.phone)}</a><a class="btn sm alt" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(x.name+", "+x.addr)}">🧭 Directions</a>${x.web?`<a class="btn sm alt" target="_blank" rel="noopener" href="${esc(x.web)}" data-trk>🌐 Website</a>`:""}</div>
       ${x.live?`<div class="pcLive small muted" data-shop="${esc(x.name)}" style="margin-top:8px"><span class="spinner"></span> Checking their stock…</div>`:""}
-    </div>`).join(""):`<p class="muted">No fly shops on our list within 200 miles of you yet. <a target="_blank" rel="noopener" href="https://www.google.com/maps/search/fly+shop/@${origin.lat},${origin.lng},9z">Find fly shops near you on Google Maps</a>.</p>`}</div>
+    </div>`).join(""):`<p class="muted">No fly shops on our list within ${rad} miles of you yet. Try a bigger distance, or <a target="_blank" rel="noopener" href="https://www.google.com/maps/search/fly+shop/@${origin.lat},${origin.lng},9z">find fly shops near you on Google Maps</a>.</p>`}</div>
     <p class="small muted" style="margin-top:8px">Prices shown are each shop's current online price; call ahead to check what's on the shelf. Know a shop we've missed? Tell us at chris@flytyingrecipes.org.</p>`);
   s.querySelectorAll("[data-trk]").forEach(a=>a.addEventListener("click",()=>trackBuy(it)));
+  $("#pcRad",s).onchange=e=>{ lsSet("fb_radius", +e.target.value); s.remove(); openPriceSheet(it); };
   $("#pcLoc",s).onclick=e=>{ e.preventDefault(); if(!navigator.geolocation) return toast("Location isn't available on this device");
     navigator.geolocation.getCurrentPosition(p=>{ lsSet("fb_loc",{lat:p.coords.latitude,lng:p.coords.longitude,label:"your location"}); s.remove(); openPriceSheet(it); }, ()=>toast("Couldn't get your location"), {timeout:10000}); };
   if(!near.some(x=>x.live)) return;
