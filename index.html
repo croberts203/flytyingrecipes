@@ -503,7 +503,7 @@ function openAuth(){
 function openAccount(){
   if(!S.user) return openAuth();
   const s = sheet(`<h2>Account</h2>
-    <p class="muted small">${esc(S.user.email)}</p>
+    <p class="muted small">${esc(S.user.email)} · the same login works in <a href="https://fishforecast.net" target="_blank" rel="noopener">Fish Bite Forecast</a></p>
     <label>Display name</label><input type="text" id="dn" value="${esc(S.profile?.display_name||"")}">
     <div class="row" style="margin-top:12px"><button class="btn" id="saveDn">Save</button><button class="btn alt" id="out">Sign out</button></div>
     <p class="small muted" id="aiLeft"></p>
@@ -513,7 +513,7 @@ function openAccount(){
     <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
     <p class="small"><a href="/privacy.html" target="_blank" rel="noopener">Privacy policy</a>${S.hidden?.size?` · <a href="#" id="unhide">Show hidden members (${S.hidden.size})</a>`:""}</p>
     <button class="btn danger" id="delAcct" style="width:100%">Delete my account</button>
-    <p class="small muted" style="margin-top:6px">Permanently deletes your login, recipes, materials inventory and fish log.</p>`);
+    <p class="small muted" style="margin-top:6px">Permanently deletes your login, recipes, materials inventory and fish log — and your Fish Bite Forecast data, which shares this account.</p>`);
   sb.from("ai_usage").select("count").eq("day", new Date().toISOString().slice(0,10)).maybeSingle().then(({data})=>{ $("#aiLeft",s).textContent = `Photo IDs used today: ${data?.count||0} of 20`; });
   if($("#statsBtn",s)) $("#statsBtn",s).onclick=()=>{ s.remove(); openStats(); };
   $("#saveDn",s).onclick = async()=>{ await sb.from("profiles").update({display_name:$("#dn",s).value.trim()}).eq("id",S.user.id); await refreshUser(); s.remove(); toast("Saved"); };
@@ -523,7 +523,7 @@ function openAccount(){
   $("#out",s).onclick = async()=>{ await sb.auth.signOut(); s.remove(); await afterAuth(); };
   if($("#unhide",s)) $("#unhide",s).onclick = async e=>{ e.preventDefault(); await sb.from("hidden_authors").delete().eq("user_id", S.user.id); s.remove(); S.flies=null; toast("Hidden members shown again"); render(); };
   $("#delAcct",s).onclick = async()=>{
-    const typed = prompt("This permanently deletes your account, all your recipes (including shared ones), your materials inventory and your fish log. It can't be undone.\n\nType DELETE to confirm.");
+    const typed = prompt("This permanently deletes your account, all your recipes (including shared ones), your materials inventory and your fish log, plus your Fish Bite Forecast spots, catches and alerts. It can't be undone.\n\nType DELETE to confirm.");
     if(typed !== "DELETE"){ if(typed!==null) toast("Not deleted. You must type DELETE."); return; }
     const b=$("#delAcct",s); b.disabled=true; b.innerHTML=`<span class="spinner"></span> Deleting…`;
     try{ await callFn("delete-account", { confirm:"DELETE" }); await sb.auth.signOut(); s.remove(); S.flies=null; await afterAuth(); toast("Your account and data were deleted", 4000); }
@@ -1533,6 +1533,7 @@ sb.auth.onAuthStateChange((evt)=>{ if(evt==="SIGNED_IN"||evt==="SIGNED_OUT") aft
 <script src="tour.js"></script>
 <script src="fbtips.js"></script>
 <script src="fbfeatures.js"></script>
+<script src="fbinstall.js"></script>
 <script src="staterules.js"></script>
 <script src="fishtails.js" data-where="app" data-side="left" data-bottom="78" defer></script>
 </body>

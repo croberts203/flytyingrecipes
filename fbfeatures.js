@@ -64,8 +64,22 @@
     var view = document.getElementById("view"), tab = document.querySelector("#tabs button.on");
     if (seen && !asked && view && tab && tab.dataset.tab === "flies" && !view.querySelector(".fxprompt") && view.querySelector("#fsp")) {
       var c = document.createElement("div"); c.className = "card fxprompt";
-      c.innerHTML = '<div class="grow"><b>Make it yours</b><div class="small muted">Pick the features you want — hide the rest.</div></div><button class="btn sm" id="fxGo">Choose</button><button class="btn sm alt" id="fxNo">Not now</button>';
+      c.style.display = "block";
+      c.innerHTML = '<b>What do you want Fly Bench for?</b> <span class="small muted">Tap all that fit — the app sets itself up.</span>'
+        + '<div class="chips" style="margin-top:8px"><span class="chip on" data-want="recipes">🪶 Fly recipes</span><span class="chip" data-want="inventory">🧰 Track my materials</span><span class="chip" data-want="log">🎣 Log my fish</span><span class="chip" data-want="regs">📏 Fishing rules</span></div>'
+        + '<div class="row" style="gap:6px;margin-top:10px"><button class="btn sm" id="fxSet">Set it up</button><button class="btn sm alt" id="fxGo">Choose features myself</button><button class="btn sm alt" id="fxNo">Skip</button></div>';
       view.insertBefore(c, view.firstChild);
+      c.querySelectorAll("[data-want]").forEach(function (x) { x.onclick = function () { if (x.dataset.want !== "recipes") x.classList.toggle("on"); }; });
+      c.querySelector("#fxSet").onclick = function () {
+        var want = {}; c.querySelectorAll("[data-want].on").forEach(function (x) { want[x.dataset.want] = 1; });
+        var o2 = {};
+        if (!want.inventory) { o2.inventory = o2.scan = o2.deskscan = o2.receipt = o2.buy = true; }
+        if (!want.log) o2.log = true;
+        if (!want.regs) o2.regs = true;
+        try { localStorage.setItem(KEY, JSON.stringify(o2)); localStorage.setItem("fb_featprompted", "1"); } catch (e) { }
+        c.remove(); apply();
+        if (window.Stats) { Stats.track("howfish_set"); Object.keys(want).forEach(function (k) { Stats.track("want_" + k); }); }
+      };
       c.querySelector("#fxGo").onclick = function () { sheet(true); };
       c.querySelector("#fxNo").onclick = function () { try { localStorage.setItem("fb_featprompted", "1"); } catch (e) { } c.remove(); };
     }
