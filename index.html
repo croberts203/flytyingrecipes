@@ -974,12 +974,29 @@ const setPending = list => S.user && lsSet("fb_pending_"+S.user.id, list);
 function buyLink({ label, material_id=null, category="other" }){
   return `<a class="buy" href="${shopUrl(label)}" target="_blank" rel="noopener" title="Opens a search sorted by lowest price (${esc(SHOPS[shopKey()].name)})" data-buy="${esc(JSON.stringify({label, material_id, category}))}">🛒 Lowest price</a>`;
 }
+const PRICE_FN = SUPABASE_URL + "/functions/v1/price-check";
+function trackBuy(it){ if(!S.user) return; it = {...it}; it.key = it.material_id ? "m"+it.material_id : "t"+it.label.toLowerCase(); it.at = Date.now(); setPending([...pendingBuys().filter(x=>x.key!==it.key), it]); }
+async function openPriceSheet(it){
+  const q = cleanBuy(it.label);
+  const s = sheet(`<h2>Lowest price</h2><p class="small muted" style="margin:0 0 8px">${esc(q)}</p><div id="pcBody"><p class="muted"><span class="spinner"></span> Checking live prices at fly shops…</p></div>
+    <h3 style="margin-top:16px">Also compare (sorted cheapest first)</h3>
+    <div class="row" style="gap:8px;flex-wrap:wrap">${Object.entries(SHOPS).map(([k,v])=>`<a class="btn sm alt" target="_blank" rel="noopener" data-trk href="${v.url(shopQuery(q))}">${esc(v.name.replace(/ \(.*\)/,""))}</a>`).join("")}</div>`);
+  s.querySelectorAll("[data-trk]").forEach(a=>a.addEventListener("click",()=>trackBuy(it)));
+  try{
+    const r = await fetch(PRICE_FN+"?q="+encodeURIComponent(q)); const j = await r.json(); if(!r.ok) throw new Error(j.error||"Price check failed");
+    const when = new Date(j.checked_at).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+    const okShops = j.shops.filter(x=>x.ok);
+    $("#pcBody",s).innerHTML = (j.items.length ? `<ul style="list-style:none;padding:0;margin:0">${j.items.map((x,i)=>`<li style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center">
+        <b style="min-width:62px;${i===0?"color:var(--sea)":""}">$${x.price.toFixed(2)}</b><span class="grow"><a href="${esc(x.url)}" target="_blank" rel="noopener" data-trk>${esc(x.title)}</a><br><span class="small muted">${esc(x.shop)}${i===0?" · cheapest found":""}</span></span></li>`).join("")}</ul>`
+        : `<p class="muted">No matching product found at the fly shops. Try the store searches below.</p>`)
+      + `<p class="small muted" style="margin-top:8px">Checked at ${when}: ${okShops.map(x=>esc(x.name)).join(", ")}${okShops.length<j.shops.length?` (${j.shops.length-okShops.length} shop${j.shops.length-okShops.length>1?"s":""} didn't answer)`:""}. Prices before shipping and tax; check the item matches your recipe before buying.</p>`;
+    $("#pcBody",s).querySelectorAll("[data-trk]").forEach(a=>a.addEventListener("click",()=>trackBuy(it)));
+  }catch(err){ $("#pcBody",s).innerHTML = `<p class="muted">Couldn't check prices right now (${esc(err.message)}). Use the store searches below.</p>`; }
+}
 function wireBuyLinks(root){
   root.querySelectorAll("[data-buy]").forEach(a=>a.onclick=e=>{
-    e.stopPropagation();
-    if(!S.user) return; // link still opens; nothing to track without a bench
-    const it = JSON.parse(a.dataset.buy); it.key = it.material_id ? "m"+it.material_id : "t"+it.label.toLowerCase(); it.at = Date.now();
-    setPending([...pendingBuys().filter(x=>x.key!==it.key), it]);
+    e.preventDefault(); e.stopPropagation();
+    openPriceSheet(JSON.parse(a.dataset.buy));
   });
 }
 let pendAsked = 0;
