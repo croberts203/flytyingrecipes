@@ -103,6 +103,7 @@
       let verb = null, lastHits = [];
       for (const c of clauses) {
         const t = " " + c + " ";
+        if (/\b(wrap|wind)s? (over )?(it|them) (down|back)\b/.test(t)) { verb = null; continue; } // thread wraps over a tied-in material
         const local = WOUND.test(t) ? "done" : TIE.test(t) ? "tied" : null;
         const listItem = /^\s*(and |or )?(the|a|an|some|two|three|four|\d)\b/.test(c);
         if (local) verb = local; else if (!listItem) verb = null;
@@ -283,7 +284,7 @@
       const c = col("body");
       parts.push(glow("body", `<circle cx="${X(0.5)}" cy="${Y - 4}" r="${L * 0.2}" fill="${c}"${edge(c)}/><circle cx="${X(0.5) - L * 0.06}" cy="${Y - 4 - L * 0.07}" r="${L * 0.05}" fill="#fff" opacity=".35"/>`));
     } else if (has("body")) {
-      const c = col("body"), m = txt("body");
+      const c = col("body"), m = txt("body") || (/thread body|body of thread/i.test((fly.fly_steps || []).map((x) => x.instruction).join(" ")) ? "thread" : "");
       let g = `<path d="${sil(bodyStart, bodyEnd, th * 0.55, th)}" fill="${c}"/>`;
       if (/chenille|estaz|cactus|ice chenille/.test(m)) {
         for (let t = bodyStart + 0.02; t < bodyEnd; t += 0.05) g += `<ellipse cx="${f1(X(t))}" cy="${Y}" rx="${f1(L * 0.026)}" ry="${f1(th * (0.7 + 0.3 * (t / bodyEnd)))}" fill="${c}" stroke="rgba(0,0,0,.18)"/>`;
