@@ -33,7 +33,8 @@
   function compOf(part, category, text) {
     const p = String(part || "").toLowerCase();
     const tx = String(text || "").toLowerCase();
-    if (/head|bead|cone|weight/.test(p) && /\b(bead|cone)\b/.test(tx) && !/resin|cement/.test(tx)) return "bead";
+    if (/head|bead|cone|weight/.test(p) && /\b(bead|cone)\b/.test(tx) && !/resin|cement|chain|eyes|dumbbell/.test(tx)) return "bead";
+    if (/weight/.test(p) && /dumbbell|bead.?chain|\beyes\b/.test(tx)) return "eyes";
     const table = [
       [/^hooks?$|shank|connection|front hook|rear hook/, null], [/pincer|claw/, "claws"], [/thread/, "thread"], [/bead|cone/, "bead"],
       [/eye/, "eyes"], [/weight|underbody/, "weight"], [/tag and rib/, "rib"], [/^tag|^tip$/, "tag"], [/butt/, "butt"],
