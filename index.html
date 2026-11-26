@@ -71,6 +71,7 @@ ol.steps{padding-left:0;list-style:none;counter-reset:s;margin:0}
 ol.steps li{counter-increment:s;position:relative;padding:0 0 14px 40px}
 ol.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:var(--slate);color:#fff;font:700 .85rem/28px var(--body);text-align:center}
 ol.steps img{width:100%;border-radius:10px;margin-top:8px}
+.stepdraw{margin-top:8px}.stepdraw svg{display:block;width:100%;height:auto;border-radius:10px}.stepdraw.tie-draw{margin:0 0 14px}.stepdraw.tie-draw svg{max-height:38vh;border-radius:16px}
 .hero{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:var(--r);margin-bottom:12px;background:#e9e3d4}
 .qty{display:flex;align-items:center;gap:6px}
 .qty button{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:#fff;font-size:1.1rem;font-weight:600}
@@ -305,6 +306,8 @@ const ytEmbed = (u, cls="") => { const p = ytParse(u); if(!p) return "";
   return `<div class="yt ${cls}"><iframe src="https://www.youtube-nocookie.com/embed/${p.id}?rel=0&playsinline=1${p.start?`&start=${p.start}`:""}" title="YouTube video" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`; };
 const commonsUrl = (u, w) => u && /^https:\/\/commons\.wikimedia\.org\//.test(u) ? u.replace(/width=\d+/, "width="+w) : u && /^https:\/\/app\.flytyingrecipes\.org\/img\//.test(u) ? u : null;
 const photoCredit = f => /^Illustration/i.test(f.photo_credit||"") ? `<p class="small muted credit">Illustration by Fly Bench showing the general look of the pattern. Have a photo of yours? Share it and we'll swap it in.</p>` : f.photo_credit && f.photo_source_url ? `<p class="small muted credit">Photo: <a href="${esc(f.photo_source_url)}" target="_blank" rel="noopener">${esc(f.photo_credit.replace(/, (CC .*|public domain)$/i,""))}</a>, ${f.photo_license_url?`<a href="${esc(f.photo_license_url)}" target="_blank" rel="noopener">${esc((f.photo_credit.match(/CC [^,]+$/)||["license"])[0])}</a>`:"public domain"}, via Wikimedia Commons. Example of the pattern, not tied by Fly Bench.</p>` : "";
+/* Original step drawing (flydiagram.js) for steps without a photo */
+const stepDrawing = (f, i, cls="") => { try{ return window.FlyDiagram && (f.fly_steps||[]).length ? `<div class="stepdraw ${cls}">${FlyDiagram.svg(f, i)}</div>` : ""; }catch(e){ return ""; } };
 const flyThumb = f => flyPhotoUrl(f.cover_photo_path) || commonsUrl(f.photo_url, 400) || ytThumb(f.youtube_url) || ytThumb([...(f.fly_steps||[])].sort((a,b)=>a.step_no-b.step_no).find(x=>x.youtube_url)?.youtube_url);
 const uid = () => crypto.randomUUID();
 // Species slug used by the public pages (/fish/redfish/) and deep links (#fish=redfish).
@@ -722,7 +725,7 @@ function openFly(id){
       ${needList.length?`<button class="btn sm alt" style="margin-top:10px" id="copyNeed">Copy shopping list (${needList.length})</button>`:""}
     </div>
     <div class="card"><h3 style="margin-bottom:10px">Steps</h3>
-      <ol class="steps">${steps.map(st=>`<li>${esc(st.instruction)}${st.photo_path?`<img loading="lazy" src="${flyPhotoUrl(st.photo_path)}" alt="Step ${st.step_no}">`:""}${st.youtube_url?(f.creator_name?`<a class="small" style="display:block;margin-top:6px" href="${esc(ytWatchUrl(st.youtube_url))}" target="_blank" rel="noopener">▶ Watch this step on YouTube</a>`:ytEmbed(st.youtube_url)):""}</li>`).join("") || `<li class="muted">No steps yet.</li>`}</ol>
+      <ol class="steps">${steps.map((st,si)=>`<li>${esc(st.instruction)}${st.photo_path?`<img loading="lazy" src="${flyPhotoUrl(st.photo_path)}" alt="Step ${st.step_no}">`:stepDrawing(f,si)}${st.youtube_url?(f.creator_name?`<a class="small" style="display:block;margin-top:6px" href="${esc(ytWatchUrl(st.youtube_url))}" target="_blank" rel="noopener">▶ Watch this step on YouTube</a>`:ytEmbed(st.youtube_url)):""}</li>`).join("") || `<li class="muted">No steps yet.</li>`}</ol>
     </div>
     ${(f.tutorial_links||[]).length?`<div class="card"><h3>Watch it tied</h3>${f.tutorial_links.map(l=>`<p style="margin:8px 0 0"><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label||l.url)} ↗</a></p>`).join("")}</div>`:""}
     ${!f.is_starter && !mine ? `<div class="row" style="margin-bottom:10px"><button class="btn sm ghost" id="repF">⚑ Report this recipe</button><span class="grow"></span>${f.author_id?`<button class="btn sm ghost" id="hideF">Hide this member's recipes</button>`:""}</div>`:""}
@@ -766,7 +769,7 @@ async function tieMode(f){
     let body="";
     if(pg.kind==="mats") body=`<div class="tie-k">Before you start</div><h2>Get these on your bench</h2><ul class="tie-mats">${mats.map(m=>{ const st=matStatus(m); return `<li><label><input type="checkbox"> <span>${st?`<span class="dot ${st}"></span>`:""}<b>${esc(m.part||"")}</b>${m.part?": ":""}${esc(m.material_text)}</span></label></li>`; }).join("")}</ul>`;
     else if(pg.kind==="step"){ const st=pg.st, ph=st.photo_path?flyPhotoUrl(st.photo_path):null, ref=flyPhotoUrl(f.cover_photo_path)||commonsUrl(f.photo_url,800);
-      body=`<div class="tie-k">Step ${pg.i+1} of ${steps.length}</div>${ph?`<img class="tie-img" src="${ph}" alt="">`:ref?`<figure class="tie-ref"><img src="${ref}" alt=""><figcaption>What you're tying</figcaption></figure>`:""}<p class="tie-txt">${esc(st.instruction)}</p>${st.youtube_url?`<a class="btn alt sm" href="${esc(ytWatchUrl(st.youtube_url))}" target="_blank" rel="noopener">▶ Watch this step</a>`:""}`; }
+      body=`<div class="tie-k">Step ${pg.i+1} of ${steps.length}</div>${ph?`<img class="tie-img" src="${ph}" alt="">`:`${stepDrawing(f,pg.i,"tie-draw")}${ref?`<figure class="tie-ref"><img src="${ref}" alt=""><figcaption>What you're tying</figcaption></figure>`:""}`}<p class="tie-txt">${esc(st.instruction)}</p>${st.youtube_url?`<a class="btn alt sm" href="${esc(ytWatchUrl(st.youtube_url))}" target="_blank" rel="noopener">▶ Watch this step</a>`:""}`; }
     else body=`<div class="tie-done">${FLY_ICON}</div><h2>Nice tie!</h2><p class="tie-sub">${tied+1>1?`That's ${tied+1} ${esc(f.name)}s.`:`Your ${esc(f.name)} is ready.`} ${S.user&&S.inventory.length?"Take the materials off your bench so your counts stay right.":"Snap a photo, then go catch something with it."}</p><div class="row" style="justify-content:center;gap:10px;flex-wrap:wrap">${S.user&&S.inventory.length?`<button class="btn" id="tUse">Update my bench</button>`:""}<button class="btn alt" id="tAgain">Tie another</button><button class="btn alt" id="tLog">Log a catch</button></div>`;
     o.innerHTML=`<div class="tie-top"><button class="tie-x" aria-label="Close">✕</button><div class="tie-name">${esc(f.name)}</div><div class="tie-bar"><i style="width:${Math.round(at/(pages.length-1)*100)}%"></i></div></div>
       <div class="tie-body">${body}</div>
@@ -1665,6 +1668,7 @@ sb.auth.onAuthStateChange((evt)=>{ if(evt==="SIGNED_IN"||evt==="SIGNED_OUT") aft
 </script>
 <script src="fish.js"></script>
 <script src="scanner.js"></script>
+<script src="flydiagram.js"></script>
 <script src="stats.js"></script>
 <script src="tour.js"></script>
 <script src="fbtips.js"></script>
