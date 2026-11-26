@@ -287,7 +287,7 @@
       let g = `<path d="${sil(bodyStart, bodyEnd, th * 0.55, th)}" fill="${c}"/>`;
       if (/chenille|estaz|cactus|ice chenille/.test(m)) {
         for (let t = bodyStart + 0.02; t < bodyEnd; t += 0.05) g += `<ellipse cx="${f1(X(t))}" cy="${Y}" rx="${f1(L * 0.026)}" ry="${f1(th * (0.7 + 0.3 * (t / bodyEnd)))}" fill="${c}" stroke="rgba(0,0,0,.18)"/>`;
-      } else if (/dub|hare|fur|squirrel|seal|antron/.test(m) || (!/floss|thread|quill|tinsel|mylar|foam|wire|herl|biot|stripped/.test(m))) {
+      } else if (/dub|hare|fur|squirrel|seal|antron/.test(m) || (!/floss|thread|quill|tinsel|mylar|foam|wire|herl|biot|stripped|braid|diamond|flash/.test(m))) {
         for (let t = bodyStart; t < bodyEnd; t += 0.012) {
           const h = th * (0.6 + 0.5 * (t - bodyStart) / (bodyEnd - bodyStart));
           g += `<line x1="${f1(X(t))}" y1="${f1(Y - h)}" x2="${f1(X(t) + 3 * Math.sin(t * 90))}" y2="${f1(Y - h - 3)}" stroke="${c}" stroke-width="1.2"/><line x1="${f1(X(t))}" y1="${f1(Y + h)}" x2="${f1(X(t) - 2 * Math.cos(t * 70))}" y2="${f1(Y + h + 3)}" stroke="${c}" stroke-width="1.2"/>`;
