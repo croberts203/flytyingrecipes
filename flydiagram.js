@@ -52,7 +52,7 @@
   }
 
   // Material nouns we look for in step text.
-  const NOUNS = /\b(foam|chenille|estaz|marabou|bucktail|hackles?|herl|dubbing|dub|wire|tinsel|biots?|elk|deer|calf|moose|floss|flash|flashabou|krystal|rabbit|zonker|fur|squirrel|partridge|hen|cock|cdc|quill|antron|zelon|poly|yarn|thin ?skin|scud ?back|legs|lead|tungsten|eyes|bead|cone|craft fur|ep fibers?|ep fibres?|polar|saddle|schlappen|ostrich|pheasant|mylar|tubing|braid|vinyl|ribbing|swiss straw|raffia|latex|mallard|teal|turkey|tippets?|sword|mohair|seal|beaver|microfibbets?|mono|body wrap|super hair|pseudo hackle|ice dub|sparkle|peacock|wool|crystal|chain)\b/g;
+  const NOUNS = /\b(foam|vernille|chenille|estaz|marabou|bucktail|hackles?|herl|dubbing|dub|wire|tinsel|biots?|elk|deer|calf|moose|floss|flash|flashabou|krystal|rabbit|zonker|fur|squirrel|partridge|hen|cock|cdc|quill|antron|zelon|poly|yarn|thin ?skin|scud ?back|legs|lead|tungsten|eyes|bead|cone|craft fur|ep fibers?|ep fibres?|polar|saddle|schlappen|ostrich|pheasant|mylar|tubing|braid|vinyl|ribbing|swiss straw|raffia|latex|mallard|teal|turkey|tippets?|sword|mohair|seal|beaver|microfibbets?|mono|body wrap|super hair|pseudo hackle|ice dub|sparkle|peacock|wool|crystal|chain)\b/g;
   const keyWords = (text) => {
     const t = String(text || "").toLowerCase().replace(/\(.*?\)/g, " ");
     const nouns = [...new Set((t.match(NOUNS) || []).map((w) => w.replace(/s$/, "")))];
@@ -286,7 +286,7 @@
     } else if (has("body")) {
       const c = col("body"), m = txt("body") || (/thread body|body of thread/i.test((fly.fly_steps || []).map((x) => x.instruction).join(" ")) ? "thread" : "");
       let g = `<path d="${sil(bodyStart, bodyEnd, th * 0.55, th)}" fill="${c}"/>`;
-      if (/chenille|estaz|cactus|ice chenille/.test(m)) {
+      if (/chenille|vernille|estaz|cactus|ice chenille/.test(m)) {
         for (let t = bodyStart + 0.02; t < bodyEnd; t += 0.05) g += `<ellipse cx="${f1(X(t))}" cy="${Y}" rx="${f1(L * 0.026)}" ry="${f1(th * (0.7 + 0.3 * (t / bodyEnd)))}" fill="${c}" stroke="rgba(0,0,0,.18)"/>`;
       } else if (/dub|hare|fur|squirrel|seal|antron/.test(m) || (!/floss|thread|quill|tinsel|mylar|foam|wire|herl|biot|stripped|braid|diamond|flash/.test(m))) {
         for (let t = bodyStart; t < bodyEnd; t += 0.012) {
