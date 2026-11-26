@@ -294,7 +294,7 @@
         }
       } else if (/herl/.test(m)) {
         for (let t = bodyStart; t < bodyEnd; t += 0.03) g += fibres(X(t), Y, th * 1.1, 270, 50, 3, c, 1) + fibres(X(t), Y, th * 1.1, 90, 50, 3, c, 1);
-      } else if (/tinsel|mylar|flash/.test(m)) {
+      } else if (/tinsel|mylar|flash|braid|diamond/.test(m)) {
         g = `<path d="${sil(bodyStart, bodyEnd, th * 0.5, th * 0.8)}" fill="url(#${uid}m)"/>` + `<path d="${sil(bodyStart, bodyEnd, th * 0.5, th * 0.8)}" fill="${c}" opacity=".55"/>`;
       } else {
         for (let t = bodyStart + 0.04; t < bodyEnd; t += 0.045) g += `<line x1="${f1(X(t))}" y1="${f1(Y - th * 0.9)}" x2="${f1(X(t) - 4)}" y2="${f1(Y + th * 0.9)}" stroke="rgba(0,0,0,.18)" stroke-width="1.2"/>`;
@@ -385,7 +385,7 @@
       const g = /stick|3d|holo|doll|tape/.test(m)
         ? `<circle cx="${X(0.86)}" cy="${Y - 3}" r="7" fill="#f2d33b" stroke="#222"/><circle cx="${X(0.865)}" cy="${Y - 3}" r="3.2" fill="#111"/>`
         : /chain/.test(m)
-          ? `<circle cx="${X(0.88)}" cy="${Y - 9}" r="6" fill="${col("eyes")}" stroke="#555"/><circle cx="${X(0.88) + 3}" cy="${Y - 7}" r="5" fill="${col("eyes")}" stroke="#555"/>`
+          ? `<circle cx="${X(0.87)}" cy="${Y - 11}" r="8.5" fill="${col("eyes")}" stroke="#555"/><circle cx="${X(0.87) + 5}" cy="${Y - 8}" r="7.5" fill="${col("eyes")}" stroke="#555"/><circle cx="${X(0.87) - 2}" cy="${Y - 14}" r="2.5" fill="#fff" opacity=".7"/>`
           : `<rect x="${X(0.87) - 3}" y="${Y - 17}" width="6" height="12" fill="#777"/><circle cx="${X(0.87)}" cy="${Y - 19}" r="8.5" fill="${col("eyes")}" stroke="#555"/><circle cx="${X(0.87)}" cy="${Y - 19}" r="4" fill="${/red|yellow/.test(m) ? col("eyes") : "#c0302e"}" opacity=".85"/>`;
       parts.push(glow("eyes", g));
     }
